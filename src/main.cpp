@@ -1,8 +1,8 @@
 #include <exception>
 #include <filesystem>
 
-#include "CLI/CLI.hpp"
-#include "fmt/base.h"
+#include <CLI/CLI.hpp>
+#include <fmt/base.h>
 
 #include "elf_loader.hpp"
 
