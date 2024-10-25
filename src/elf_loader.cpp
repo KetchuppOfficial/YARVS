@@ -5,6 +5,7 @@
 
 #include <fmt/format.h>
 
+#include "common.hpp"
 #include "elf_loader.hpp"
 
 namespace yarvs
@@ -58,7 +59,7 @@ LoadableImage::LoadableImage(const std::string &path_str)
 
     for (auto &seg : std::views::filter(elf.segments, is_loadable))
     {
-        emplace_back(reinterpret_cast<const uint8_t *>(seg->get_data()), seg->get_file_size(),
+        emplace_back(reinterpret_cast<const Byte *>(seg->get_data()), seg->get_file_size(),
                      seg->get_memory_size(), seg->get_virtual_address(), seg->get_flags());
     }
 

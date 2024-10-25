@@ -2,19 +2,20 @@
 #define INCLUDE_ELF_LOADER_HPP
 
 #include <vector>
-#include <cstdint>
 #include <cstddef>
 #include <string>
 #include <filesystem>
 
 #include <elfio/elfio.hpp>
 
+#include "common.hpp"
+
 namespace yarvs
 {
 
-class LoadableSegment final : private std::vector<uint8_t>
+class LoadableSegment final : private std::vector<Byte>
 {
-    using Base = std::vector<uint8_t>;
+    using Base = std::vector<Byte>;
 
 public:
 
@@ -22,8 +23,8 @@ public:
     static constexpr auto kWritable = ELFIO::PF_W;
     static constexpr auto kReadable = ELFIO::PF_R;
 
-    LoadableSegment(const uint8_t *data, std::size_t file_size, std::size_t memory_size,
-                     std::size_t v_addr, ELFIO::Elf_Word flags)
+    LoadableSegment(const Byte *data, std::size_t file_size, std::size_t memory_size,
+                    std::size_t v_addr, ELFIO::Elf_Word flags)
         : Base(data, data + file_size),
           memory_size_{memory_size}, v_addr_{v_addr}, flags_{flags} {}
 
