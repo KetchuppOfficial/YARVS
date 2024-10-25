@@ -1,0 +1,8 @@
+[requires]
+fmt/11.0.2
+elfio/3.12
+cli11/2.4.2
+
+[generators]
+CMakeToolchain
+CMakeDeps
