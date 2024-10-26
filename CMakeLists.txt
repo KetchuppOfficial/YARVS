@@ -10,14 +10,21 @@ endif()
 find_package(fmt REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(elfio REQUIRED)
+find_package(Python REQUIRED COMPONENTS Interpreter)
 
 set(SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
 set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
+set(CODEGEN_DIR ${PROJECT_SOURCE_DIR}/code-gen)
+set(BUILD_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include) # temporary set
+
+add_subdirectory(code-gen)
 
 add_executable(yarvs
     ${SOURCE_DIR}/main.cpp
     ${SOURCE_DIR}/elf_loader.cpp
 )
+
+add_dependencies(yarvs code_generator)
 
 set_target_properties(yarvs PROPERTIES
     CXX_STANDARD 23
@@ -26,7 +33,7 @@ set_target_properties(yarvs PROPERTIES
 )
 
 target_include_directories(yarvs
-    PRIVATE ${INCLUDE_DIR}
+    PRIVATE ${INCLUDE_DIR} ${BUILD_INCLUDE_DIR}
 )
 
 target_link_libraries(yarvs
