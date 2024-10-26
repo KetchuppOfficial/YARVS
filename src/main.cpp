@@ -5,6 +5,7 @@
 #include <fmt/base.h>
 
 #include "elf_loader.hpp"
+#include "identifiers.hpp"
 
 int main(int argc, char **argv) try
 {
@@ -28,6 +29,9 @@ int main(int argc, char **argv) try
         fmt::println("    memory size: {} bytes", seg.get_memory_size());
         fmt::println("    virtual address: {:#x}", seg.get_virtual_addr());
     }
+
+    // just to show that generated IDs are visible
+    fmt::println("{}", static_cast<int>(yarvs::InstrID::kADD));
 
     return 0;
 }
