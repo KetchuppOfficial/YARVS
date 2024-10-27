@@ -1,14 +1,15 @@
 #ifndef INCLUDE_DECODER_HPP
 #define INCLUDE_DECODER_HPP
 
+#include <array>
 #include <stdexcept>
 #include <unordered_map>
-#include <vector>
 
 #include <fmt/format.h>
 
 #include "common.hpp"
 #include "instruction.hpp"
+#include "bits_manipulation.hpp"
 
 namespace yarvs
 {
@@ -25,7 +26,9 @@ public:
 
     static Instruction decode(RawInstruction raw_instr)
     {
-        for (auto mask : masks_)
+        auto opcode = get_bits<6, 0>(raw_instr);
+        mask_type mask = masks_[opcode];
+        if (mask != 0)
         {
             auto it = match_map_.find(raw_instr & mask);
             if (it != match_map_.end())
@@ -38,7 +41,7 @@ public:
 private:
 
     // both are generated from risc-v opcodes
-    static const std::vector<mask_type> masks_;
+    static const std::array<mask_type, 1 << kOpcodeBitLen> masks_;
     static const std::unordered_map<match_type, decoding_func_type> match_map_;
 };
 

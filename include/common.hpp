@@ -15,6 +15,7 @@ using DoubleWord = uint64_t;
 using RawInstruction = uint32_t;
 
 constexpr auto kXLen = sizeof(DoubleWord) * CHAR_BIT;
+constexpr std::size_t kOpcodeBitLen = 7;
 
 } // namespace yarvs
 
