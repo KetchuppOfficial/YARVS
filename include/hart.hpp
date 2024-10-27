@@ -1,0 +1,26 @@
+#ifndef INCLUDE_HART_HPP
+#define INCLUDE_HART_HPP
+
+#include "common.hpp"
+#include "reg_file.hpp"
+
+namespace yarvs
+{
+
+class Hart final
+{
+public:
+
+    Hart(Word entry_point) noexcept : pc_{entry_point} {}
+
+    Word get_pc() const noexcept { return pc_; }
+
+private:
+
+    RegFile reg_file_;
+    Word pc_;
+};
+
+} // namespace yarvs
+
+#endif // INCLUDE_HART_HPP
