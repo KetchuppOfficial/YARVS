@@ -21,7 +21,7 @@ LoadableImage::LoadableImage(const std::string &path_str)
         throw std::invalid_argument{fmt::format("ELF file is invalid: {}", error_msg)};
 
     if (elf.get_class() != ELFIO::ELFCLASS64)
-        throw std::invalid_argument{fmt::format("only 64-bit ELF files are supported")};
+        throw std::invalid_argument{"only 64-bit ELF files are supported"};
 
     if (auto type = elf.get_type(); type != ELFIO::ET_EXEC)
     {
@@ -53,7 +53,7 @@ LoadableImage::LoadableImage(const std::string &path_str)
     }
 
     if (elf.get_machine() != ELFIO::EM_RISCV)
-        throw std::invalid_argument{fmt::format("only RISC-V executables are supported")};
+        throw std::invalid_argument{"only RISC-V executables are supported"};
 
     auto is_loadable = [](auto &seg){ return seg->get_type() == ELFIO::PT_LOAD; };
 
