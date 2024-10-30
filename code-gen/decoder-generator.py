@@ -80,13 +80,23 @@ def generate_one_instr(id : str, info : dict) -> str:
         out += " " * 12 + ".rs2 = get_bits<24, 20>(raw_instr),\n"
     if "rd" in vars:
         out += " " * 12 + ".rd = get_bits<11, 7>(raw_instr),\n"
-    if "imm12" in vars:
-        out += " " * 12 + ".imm = get_bits<31, 25>(raw_instr),\n"
-    elif "imm20" in vars:
-        out += " " * 12 + ".imm = get_bits<31, 12>(raw_instr),\n"
-    elif "bimm12hi" in vars and "bimm12lo" in vars:
-        out += " " * 12 + ".imm = (get_bits<31, 25>(raw_instr) << 5) | get_bits<11, 7>(raw_instr),\n"
-
+    if "imm12" in vars: # i-immediate
+        out += " " * 12 + ".imm = sext<12, Word>(get_bits<31, 25>(raw_instr)),\n"
+    elif "imm12hi" in vars and "imm12lo" in vars: # s-immediate
+        out += " " * 12 + ".imm = sext<12, Word>((get_bits<31, 25>(raw_instr) << 5) |"\
+                          " get_bits<11, 7>(raw_instr)),\n"
+    elif "bimm12hi" in vars and "bimm12lo" in vars: # b-immediate
+        out += " " * 12 + ".imm = sext<13, Word>((get_bits<11, 8>(raw_instr) << 1) |\n" + \
+               " " * 34 + "(get_bits<30, 25>(raw_instr) << 5) |\n" + \
+               " " * 34 + "(get_bit<7>(raw_instr) << 11) |\n" + \
+               " " * 34 + "(get_bit<31>(raw_instr) << 12)),\n"
+    elif "imm20" in vars: # u-immediate
+        out += " " * 12 + ".imm = mask_bits<31, 12>(raw_instr),\n"
+    elif "jimm20" in vars: # j-immediate
+        out += " " * 12 + ".imm = sext<21, Word>((get_bits<30, 21>(raw_instr) << 1) |\n" + \
+               " " * 34 + "(get_bit<20>(raw_instr) << 11) |\n" + \
+               " " * 34 + "(mask_bits<19, 12>(raw_instr)) |\n" + \
+               " " * 34 + "(get_bit<31>(raw_instr) << 20)),\n"
     out += " " * 12 + f".callback = execute_{id}\n" + " " * 8 + "};\n" + \
            " " * 4 + "}}"
 
