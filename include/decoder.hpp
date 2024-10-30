@@ -38,6 +38,28 @@ public:
         throw std::invalid_argument{fmt::format("unknown instruction: {:#x}", raw_instr)};
     }
 
+    static constexpr DoubleWord decode_s_imm(RawInstruction raw_instr) noexcept
+    {
+        return sext<12, DoubleWord>((get_bits<11, 7>(raw_instr))
+                                  | (get_bits<31, 25>(raw_instr) << 5));
+    }
+
+    static constexpr DoubleWord decode_b_imm(RawInstruction raw_instr) noexcept
+    {
+        return sext<12, DoubleWord>((get_bits<11, 8>(raw_instr) << 1)
+                                  | (get_bits<30, 25>(raw_instr) << 5)
+                                  | (get_bit<7>(raw_instr) << 11)
+                                  | (get_bit<31>(raw_instr) << 12));
+    }
+
+    static constexpr DoubleWord decode_j_imm(RawInstruction raw_instr) noexcept
+    {
+        return sext<20, DoubleWord>((get_bits<30, 21>(raw_instr) << 1)
+                                  | (get_bit<20>(raw_instr) << 11)
+                                  | (mask_bits<19, 12>(raw_instr))
+                                  | (get_bit<31>(raw_instr) << 20));
+    }
+
 private:
 
     // both are generated from risc-v opcodes

@@ -18,9 +18,6 @@ add_custom_command(
     DEPENDS ${PROJECT_SOURCE_DIR}/riscv-opcodes/parse.py
 )
 
-set(INSTRUCTION_IDS ${BUILD_INCLUDE_DIR}/identifiers.hpp)
-set(DECODER ${BUILD_SRC_DIR}/decoder.cpp)
-
 add_custom_command(
     COMMENT "Creating virtual environment for code generation"
     OUTPUT ${BUILD_CODEGEN_DIR}/.venv
@@ -29,6 +26,8 @@ add_custom_command(
     COMMAND . .venv/bin/activate &&
             pip3 install -r requirements.txt --require-virtualenv
 )
+
+set(INSTRUCTION_IDS ${BUILD_INCLUDE_DIR}/identifiers.hpp)
 
 add_custom_command(
     COMMENT "Generating instruction identifiers"
@@ -40,6 +39,20 @@ add_custom_command(
     DEPENDS ${CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML} ${BUILD_CODEGEN_DIR}/.venv
 )
 
+set(EXECUTOR_HEADER ${BUILD_INCLUDE_DIR}/executor.hpp)
+
+add_custom_command(
+    COMMENT "Generating declarations of executors"
+    OUTPUT ${EXECUTOR_HEADER}
+    WORKING_DIRECTORY ${BUILD_CODEGEN_DIR}
+    COMMAND . .venv/bin/activate &&
+            ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML}
+                --exec ${EXECUTOR_HEADER}
+    DEPENDS ${CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML} ${BUILD_CODEGEN_DIR}/.venv
+)
+
+set(DECODER ${BUILD_SRC_DIR}/decoder.cpp)
+
 add_custom_command(
     COMMENT "Generating decoder"
     OUTPUT ${DECODER}
@@ -47,7 +60,7 @@ add_custom_command(
     COMMAND . .venv/bin/activate &&
             ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML}
                 --decoder ${DECODER}
-    DEPENDS ${INSTRUCTION_IDS}
+    DEPENDS ${INSTRUCTION_IDS} ${EXECUTOR_HEADER}
 )
 
 add_custom_target(code_generator
