@@ -15,6 +15,9 @@ public:
 
     Word get_pc() const noexcept { return pc_; }
 
+    template<typename Self>
+    auto &&gprs(this Self &&self) noexcept { return self.reg_file_; }
+
 private:
 
     RegFile reg_file_;
