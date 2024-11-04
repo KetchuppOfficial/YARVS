@@ -14,6 +14,7 @@ public:
     Hart(Word entry_point) noexcept : pc_{entry_point} {}
 
     Word get_pc() const noexcept { return pc_; }
+    void set_pc(DoubleWord pc) noexcept { pc_ = pc; }
 
     template<typename Self>
     auto &&gprs(this Self &&self) noexcept { return self.reg_file_; }
