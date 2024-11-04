@@ -1,3 +1,4 @@
+#include <concepts>
 #include <functional>
 #include <type_traits>
 
@@ -11,7 +12,7 @@ namespace yarvs
 
 // RV32I integer register-register operations
 
-template<typename F>
+template<std::regular_invocable<DoubleWord, DoubleWord> F>
 void exec_rvi_reg_reg(const Instruction &instr, Hart &h, F bin_op)
 noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
 {
@@ -73,7 +74,7 @@ void exec_sra(const Instruction &instr, Hart &h) noexcept
 
 // RV32I integer register-immediate instructions
 
-template<typename F>
+template<std::regular_invocable<DoubleWord, DoubleWord> F>
 void exec_rvi_reg_imm(const Instruction &instr, Hart &h, F bin_op)
 noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
 {
@@ -123,6 +124,66 @@ void exec_lui(const Instruction &instr, Hart &h) noexcept
 void exec_auipc(const Instruction &instr, Hart &h) noexcept
 {
     h.gprs().set_reg(instr.rd, h.get_pc() + instr.imm);
+}
+
+// RV32I control transfer instructions
+
+void exec_jal(const Instruction &instr, Hart &h) noexcept
+{
+    h.gprs().set_reg(instr.rd, h.get_pc() + sizeof(RawInstruction));
+    h.set_pc(h.get_pc() + instr.rd);
+}
+
+void exec_jalr(const Instruction &instr, Hart &h) noexcept
+{
+    auto &gprs = h.gprs();
+    gprs.set_reg(instr.rd, h.get_pc() + sizeof(RawInstruction));
+    h.set_pc((gprs.get_reg(instr.rs1) + instr.imm) & ~DoubleWord{1});
+}
+
+template<std::predicate<DoubleWord, DoubleWord> F>
+void exec_cond_branch(const Instruction &instr, Hart &h, F bin_op)
+noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+{
+    auto &gprs = h.gprs();
+    if (bin_op(gprs.get_reg(instr.rs1), gprs.get_reg(instr.rs2)))
+        h.set_pc(h.get_pc() + instr.imm);
+}
+
+void exec_beq(const Instruction &instr, Hart &h) noexcept
+{
+    exec_cond_branch(instr, h, std::equal_to{});
+}
+
+void exec_bne(const Instruction &instr, Hart &h) noexcept
+{
+    exec_cond_branch(instr, h, std::not_equal_to{});
+}
+
+void exec_blt(const Instruction &instr, Hart &h) noexcept
+{
+    exec_cond_branch(instr, h, [](auto lhs, auto rhs)
+    {
+        return to_signed(lhs) < to_signed(rhs);
+    });
+}
+
+void exec_bltu(const Instruction &instr, Hart &h) noexcept
+{
+    exec_cond_branch(instr, h, std::less{});
+}
+
+void exec_bge(const Instruction &instr, Hart &h) noexcept
+{
+    exec_cond_branch(instr, h, [](auto lhs, auto rhs)
+    {
+        return to_signed(lhs) > to_signed(rhs);
+    });
+}
+
+void exec_bgeu(const Instruction &instr, Hart &h) noexcept
+{
+    exec_cond_branch(instr, h, std::greater{});
 }
 
 } // namespace yarvs
