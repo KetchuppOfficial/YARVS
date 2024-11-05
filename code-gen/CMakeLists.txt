@@ -39,15 +39,15 @@ add_custom_command(
     DEPENDS ${CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML} ${BUILD_CODEGEN_DIR}/.venv
 )
 
-set(EXECUTOR_HEADER ${BUILD_INCLUDE_DIR}/executor.hpp)
+set(EXECUTOR_TABLE_HEADER ${BUILD_INCLUDE_DIR}/executor_table.hpp)
 
 add_custom_command(
-    COMMENT "Generating declarations of executors"
-    OUTPUT ${EXECUTOR_HEADER}
+    COMMENT "Generating lookup table for executor"
+    OUTPUT ${EXECUTOR_TABLE_HEADER}
     WORKING_DIRECTORY ${BUILD_CODEGEN_DIR}
     COMMAND . .venv/bin/activate &&
             ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML}
-                --exec ${EXECUTOR_HEADER}
+                --exec ${EXECUTOR_TABLE_HEADER}
     DEPENDS ${CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML} ${BUILD_CODEGEN_DIR}/.venv
 )
 
@@ -60,7 +60,7 @@ add_custom_command(
     COMMAND . .venv/bin/activate &&
             ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML}
                 --decoder ${DECODER}
-    DEPENDS ${INSTRUCTION_IDS} ${EXECUTOR_HEADER}
+    DEPENDS ${INSTRUCTION_IDS} ${EXECUTOR_TABLE_HEADER}
 )
 
 add_custom_target(code_generator

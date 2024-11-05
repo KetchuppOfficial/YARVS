@@ -1,16 +1,18 @@
 #include <concepts>
 #include <functional>
+#include <stdexcept>
 #include <type_traits>
 
+#include "hart.hpp"
 #include "common.hpp"
-#include "executor.hpp" // generated header
+#include "executor.hpp"
 #include "instruction.hpp"
 #include "bits_manipulation.hpp"
 
 namespace yarvs
 {
 
-// RV32I integer register-register operations
+// RVI integer register-register operations
 
 template<std::regular_invocable<DoubleWord, DoubleWord> F>
 void exec_rvi_reg_reg(const Instruction &instr, Hart &h, F bin_op)
@@ -54,25 +56,64 @@ void exec_slt(const Instruction &instr, Hart &h) noexcept
     exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs){ return to_signed(lhs) < to_signed(rhs); });
 }
 
+// RVI64 integer register-register operations
+
+template<std::regular_invocable<DoubleWord, DoubleWord> F>
+void exec_rv64i_reg_reg(const Instruction &instr, Hart &h, F bin_op)
+noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+{
+    auto &gprs = h.gprs();
+    auto res = bin_op(gprs.get_reg(instr.rs1), gprs.get_reg(instr.rs2));
+    gprs.set_reg(instr.rd, sext<32, DoubleWord>(static_cast<Word>(res)));
+}
+
+void exec_addw(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rv64i_reg_reg(instr, h, std::plus{});
+}
+
+void exec_subw(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rv64i_reg_reg(instr, h, std::minus{});
+}
+
 void exec_sll(const Instruction &instr, Hart &h) noexcept
 {
-    exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs){ return lhs << mask_bits<4, 0>(rhs); });
+    exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs){ return lhs << mask_bits<5, 0>(rhs); });
 }
 
 void exec_srl(const Instruction &instr, Hart &h) noexcept
 {
-    exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs){ return lhs >> mask_bits<4, 0>(rhs); });
+    exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs){ return lhs >> mask_bits<5, 0>(rhs); });
 }
 
 void exec_sra(const Instruction &instr, Hart &h) noexcept
 {
     exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs)
     {
-        return to_unsigned(to_signed(lhs) >> mask_bits<4, 0>(rhs));
+        return to_unsigned(to_signed(lhs) >> mask_bits<5, 0>(rhs));
     });
 }
 
-// RV32I integer register-immediate instructions
+void exec_sllw(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rv64i_reg_reg(instr, h, [](auto lhs, auto rhs){ return lhs << mask_bits<4, 0>(rhs); });
+}
+
+void exec_srlw(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rv64i_reg_reg(instr, h, [](auto lhs, auto rhs){ return lhs >> mask_bits<4, 0>(rhs); });
+}
+
+void exec_sraw(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rv64i_reg_reg(instr, h, [](auto lhs, auto rhs)
+    {
+        return to_signed(lhs) >> mask_bits<4, 0>(rhs);
+    });
+}
+
+// RVI integer register-immediate instructions
 
 template<std::regular_invocable<DoubleWord, DoubleWord> F>
 void exec_rvi_reg_imm(const Instruction &instr, Hart &h, F bin_op)
@@ -126,7 +167,65 @@ void exec_auipc(const Instruction &instr, Hart &h) noexcept
     h.gprs().set_reg(instr.rd, h.get_pc() + instr.imm);
 }
 
-// RV32I control transfer instructions
+// RV64I integer register-immediate instructions
+
+template<std::regular_invocable<DoubleWord, DoubleWord> F>
+void exec_rv64i_reg_imm(const Instruction &instr, Hart &h, F bin_op)
+noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+{
+    auto &gprs = h.gprs();
+    auto res = bin_op(gprs.get_reg(instr.rs1), instr.imm);
+    gprs.set_reg(instr.rd, sext<32, DoubleWord>(static_cast<Word>(res)));
+}
+
+void exec_addiw(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rv64i_reg_imm(instr, h, std::plus{});
+}
+
+void exec_slli(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rvi_reg_imm(instr, h, [](auto lhs, auto rhs){ return lhs << mask_bits<5, 0>(rhs); });
+}
+
+void exec_srli(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rvi_reg_imm(instr, h, [](auto lhs, auto rhs){ return lhs >> mask_bits<5, 0>(rhs); });
+}
+
+void exec_srai(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rvi_reg_imm(instr, h, [](auto lhs, auto rhs)
+    {
+        return to_unsigned(to_signed(lhs) >> mask_bits<5, 0>(rhs));
+    });
+}
+
+void exec_slliw(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rv64i_reg_imm(instr, h, [](auto lhs, auto rhs)
+    {
+        return lhs << mask_bits<5, 0>(rhs);
+    });
+}
+
+void exec_srliw(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rv64i_reg_imm(instr, h, [](auto lhs, auto rhs)
+    {
+        return lhs >> mask_bits<5, 0>(rhs);
+    });
+}
+
+void exec_sraiw(const Instruction &instr, Hart &h) noexcept
+{
+    exec_rv64i_reg_imm(instr, h, [](auto lhs, auto rhs)
+    {
+        return to_signed(lhs) >> mask_bits<5, 0>(rhs);
+    });
+}
+
+// RVI control transfer instructions
 
 void exec_jal(const Instruction &instr, Hart &h) noexcept
 {
@@ -177,13 +276,13 @@ void exec_bge(const Instruction &instr, Hart &h) noexcept
 {
     exec_cond_branch(instr, h, [](auto lhs, auto rhs)
     {
-        return to_signed(lhs) > to_signed(rhs);
+        return to_signed(lhs) >= to_signed(rhs);
     });
 }
 
 void exec_bgeu(const Instruction &instr, Hart &h) noexcept
 {
-    exec_cond_branch(instr, h, std::greater{});
+    exec_cond_branch(instr, h, std::greater_equal{});
 }
 
 // RV64I load and store instructions
@@ -223,4 +322,25 @@ void exec_sw(const Instruction &instr, Hart &h) noexcept { exec_store<Word>(inst
 void exec_sh(const Instruction &instr, Hart &h) noexcept { exec_store<HalfWord>(instr, h); }
 void exec_sb(const Instruction &instr, Hart &h) noexcept { exec_store<Byte>(instr, h); }
 
+// RVI memory ordering instructions
+
+void exec_fence(const Instruction &instr, Hart &h)
+{
+    throw std::runtime_error{"not implemented"};
+}
+
+// RVI environment call and breakpoints
+
+void exec_ecall(const Instruction &instr, Hart &h)
+{
+    throw std::runtime_error{"not implemented"};
+}
+
+void exec_ebreak(const Instruction &instr, Hart &h)
+{
+    throw std::runtime_error{"not implemented"};
+}
+
 } // namespace yarvs
+
+#include "executor_table.hpp"
