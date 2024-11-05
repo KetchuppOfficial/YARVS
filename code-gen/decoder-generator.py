@@ -74,27 +74,26 @@ def generate_one_instr(id : str, info : dict) -> str:
 
     out : str = " " * 4  + "{" + f"{info["match"]}, [](RawInstruction raw_instr)" + "{\n" + \
                 " " * 8  + "return Instruction{\n" + \
-                " " * 12 + f".id = InstrID::k{id.upper()},\n"
+                " " * 12 + f".id = InstrID::k{id.upper()}"
     if "rs1" in vars:
-        out += " " * 12 + ".rs1 = get_bits_r<19, 15, Byte>(raw_instr),\n"
+        out += ",\n" + " " * 12 + ".rs1 = get_bits_r<19, 15, Byte>(raw_instr)"
     if "rs2" in vars:
-        out += " " * 12 + ".rs2 = get_bits_r<24, 20, Byte>(raw_instr),\n"
+        out += ",\n" + " " * 12 + ".rs2 = get_bits_r<24, 20, Byte>(raw_instr)"
     if "rd" in vars:
-        out += " " * 12 + ".rd = get_bits_r<11, 7, Byte>(raw_instr),\n"
+        out += ",\n" + " " * 12 + ".rd = get_bits_r<11, 7, Byte>(raw_instr)"
 
     if "imm12" in vars: # i-immediate
-        out += " " * 12 + ".imm = sext<12, DoubleWord>(get_bits<31, 25>(raw_instr)),\n"
+        out += ",\n" + " " * 12 + ".imm = sext<12, DoubleWord>(get_bits<31, 25>(raw_instr))"
     elif "imm12hi" in vars and "imm12lo" in vars: # s-immediate
-        out += " " * 12 + ".imm = decode_s_imm(raw_instr),\n"
+        out += ",\n" + " " * 12 + ".imm = decode_s_imm(raw_instr)"
     elif "bimm12hi" in vars and "bimm12lo" in vars: # b-immediate
-        out += " " * 12 + ".imm = decode_b_imm(raw_instr),\n"
+        out += ",\n" + " " * 12 + ".imm = decode_b_imm(raw_instr)"
     elif "imm20" in vars: # u-immediate
-        out += " " * 12 + ".imm = mask_bits<31, 12>(raw_instr),\n"
+        out += ",\n" + " " * 12 + ".imm = mask_bits<31, 12>(raw_instr)"
     elif "jimm20" in vars: # j-immediate
-        out += " " * 12 + ".imm = decode_j_imm(raw_instr),\n"
+        out += ",\n" + " " * 12 + ".imm = decode_j_imm(raw_instr)"
 
-    out += " " * 12 + f".callback = exec_{id}\n" + " " * 8 + "};\n" + \
-           " " * 4 + "}}"
+    out += "\n" + " " * 8 + "};\n" + " " * 4 + "}}"
 
     return out
 
@@ -114,7 +113,6 @@ def generate_decoder(data : dict[str, dict], output_path : str) -> None:
 #include "bits_manipulation.hpp"
 #include "decoder.hpp"
 
-#include "executor.hpp"
 #include "identifiers.hpp"
 
 namespace yarvs
