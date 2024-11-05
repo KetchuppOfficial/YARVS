@@ -20,10 +20,13 @@ set(SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
 set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 set(CODEGEN_DIR ${PROJECT_SOURCE_DIR}/code-gen)
 set(BUILD_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include) # temporary set
+set(BUILD_SOURCE_DIR ${PROJECT_BINARY_DIR}/src)
 
 add_executable(yarvs
     ${SOURCE_DIR}/main.cpp
     ${SOURCE_DIR}/elf_loader.cpp
+    ${SOURCE_DIR}/executor.cpp
+    ${BUILD_SOURCE_DIR}/decoder.cpp
 )
 
 add_dependencies(yarvs code_generator)
