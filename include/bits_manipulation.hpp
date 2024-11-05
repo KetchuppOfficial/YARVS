@@ -16,6 +16,31 @@ template<std::integral T>
 constexpr std::size_t kNBits = sizeof(T) * CHAR_BIT;
 
 /*
+ * Masks bits [to; from] (from <= to) of the input
+ *
+ *  15  13               5         0
+ *   0 1 0 0 1 0 1 1 1 0 1 0 0 1 1 0 -----> 0000101110100000
+ *       ^               ^
+ *       to             from
+ */
+template<std::size_t to, std::size_t from, std::unsigned_integral T>
+constexpr T mask_bits(T num) noexcept
+{
+    static_assert(from <= to);
+    static_assert(to < kNBits<T>);
+
+    auto mask = []
+    {
+        if constexpr (to == kNBits<T> - 1)
+            return ~T{0} - ((T{1} << from) - 1);
+        else
+            return (T{1} << (to + 1)) - (T{1} << from);
+    }();
+
+    return num & mask;
+}
+
+/*
  * Returns bits [to; from] (from <= to) of the input shifted to the low bits
  *
  *  15  13               5         0
@@ -29,7 +54,7 @@ constexpr T get_bits(T num) noexcept
     static_assert(from <= to);
     static_assert(to < kNBits<T>);
 
-    return (num << kNBits<T> - to - 1) >> (kNBits<T> + from - to - 1);
+    return mask_bits<to, from>(num) >> from;
 }
 
 /*
@@ -60,31 +85,6 @@ constexpr T get_bit(T num) noexcept
     static_assert(n < kNBits<T>);
 
     return (num & (T{1} << n)) >> n;
-}
-
-/*
- * Masks bits [to; from] (from <= to) of the input
- *
- *  15  13               5         0
- *   0 1 0 0 1 0 1 1 1 0 1 0 0 1 1 0 -----> 0000101110100000
- *       ^               ^
- *       to             from
- */
-template<std::size_t to, std::size_t from, std::unsigned_integral T>
-constexpr T mask_bits(T num) noexcept
-{
-    static_assert(from <= to);
-    static_assert(to < kNBits<T>);
-
-    auto mask = []
-    {
-        if constexpr (to == kNBits<T> - 1)
-            return ~T{0} - (T{1} << from);
-        else
-            return (T{1} << (to + 1)) - (T{1} << from);
-    }();
-
-    return num & mask;
 }
 
 template<std::unsigned_integral T>
