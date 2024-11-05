@@ -2,6 +2,8 @@
 #define INCLUDE_MEMORY_MEMORY_HPP
 
 #include <cstddef>
+#include <iterator>
+#include <algorithm>
 
 #include "common.hpp"
 #include "memory/mmap_wrapper.hpp"
@@ -29,6 +31,13 @@ public:
     {
         // temporary implementation without virtual memory
         *reinterpret_cast<T*>(&physical_mem_[addr]) = value;
+    }
+
+    template<std::forward_iterator It>
+    void store(DoubleWord addr, It first, It last)
+    {
+        using value_type = typename std::iterator_traits<It>::value_type;
+        std::copy(first, last, reinterpret_cast<value_type *>(&physical_mem_[addr]));
     }
 
 private:
