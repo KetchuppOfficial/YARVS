@@ -87,6 +87,12 @@ constexpr T mask_bits(T num) noexcept
     return num & mask;
 }
 
+template<std::unsigned_integral T>
+constexpr auto to_signed(T num) noexcept { return static_cast<std::make_signed_t<T>>(num); }
+
+template<std::signed_integral T>
+constexpr auto to_unsigned(T num) noexcept { return static_cast<std::make_unsigned_t<T>>(num); }
+
 /*
  * Sign extened first <from_bits> of input to kNBits<To>
  *
@@ -100,17 +106,18 @@ constexpr To sext(From num) noexcept
 {
     static_assert(from_bits > 0);
     static_assert(from_bits <= kNBits<From>);
-    static_assert(from_bits < kNBits<To>);
+    static_assert(sizeof(From) <= sizeof(To));
 
-    auto sign_bit_mask = To{1} << from_bits - 1;
-    return (num ^ sign_bit_mask) - sign_bit_mask;
+    if constexpr (from_bits == kNBits<To>)
+        return num;
+    else if constexpr (from_bits == 8 || from_bits == 16 || from_bits == 32)
+        return static_cast<To>(to_signed(num));
+    else
+    {
+        auto sign_bit_mask = To{1} << from_bits - 1;
+        return (num ^ sign_bit_mask) - sign_bit_mask;
+    }
 }
-
-template<std::unsigned_integral T>
-constexpr auto to_signed(T num) noexcept { return static_cast<std::make_signed_t<T>>(num); }
-
-template<std::signed_integral T>
-constexpr auto to_unsigned(T num) noexcept { return static_cast<std::make_unsigned_t<T>>(num); }
 
 } // namespace yarvs
 
