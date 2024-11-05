@@ -29,7 +29,7 @@ constexpr T get_bits(T num) noexcept
     static_assert(from <= to);
     static_assert(to < kNBits<T>);
 
-    return (num << kNBits<T> - to - 1) >> from;
+    return (num << kNBits<T> - to - 1) >> (kNBits<T> + from - to - 1);
 }
 
 /*
