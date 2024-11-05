@@ -186,4 +186,41 @@ void exec_bgeu(const Instruction &instr, Hart &h) noexcept
     exec_cond_branch(instr, h, std::greater{});
 }
 
+// RV64I load and store instructions
+
+template<riscv_type T>
+void exec_load(const Instruction &instr, Hart &h) noexcept
+{
+    auto value = h.memory().load<T>(instr.rs1 + instr.imm);
+    h.gprs().set_reg(instr.rd, sext<sizeof(T), DoubleWord>(value));
+}
+
+void exec_ld(const Instruction &instr, Hart &h) noexcept { exec_load<DoubleWord>(instr, h); }
+void exec_lw(const Instruction &instr, Hart &h) noexcept { exec_load<Word>(instr, h); }
+void exec_lh(const Instruction &instr, Hart &h) noexcept { exec_load<HalfWord>(instr, h); }
+void exec_lb(const Instruction &instr, Hart &h) noexcept { exec_load<Byte>(instr, h); }
+
+template<typename T>
+requires riscv_type<T> && (!std::is_same_v<T, DoubleWord>)
+void exec_uload(const Instruction &instr, Hart &h) noexcept
+{
+    auto value = h.memory().load<T>(instr.rs1 + instr.imm);
+    h.gprs().set_reg(instr.rd, static_cast<DoubleWord>(value));
+}
+
+void exec_lwu(const Instruction &instr, Hart &h) noexcept { exec_uload<Word>(instr, h); }
+void exec_lhu(const Instruction &instr, Hart &h) noexcept { exec_uload<HalfWord>(instr, h); }
+void exec_lbu(const Instruction &instr, Hart &h) noexcept { exec_uload<Byte>(instr, h); }
+
+template<riscv_type T>
+void exec_store(const Instruction &instr, Hart &h) noexcept
+{
+    h.memory().store(instr.rs1 + instr.imm, static_cast<T>(h.gprs().get_reg(instr.rs2)));
+}
+
+void exec_sd(const Instruction &instr, Hart &h) noexcept { exec_store<DoubleWord>(instr, h); }
+void exec_sw(const Instruction &instr, Hart &h) noexcept { exec_store<Word>(instr, h); }
+void exec_sh(const Instruction &instr, Hart &h) noexcept { exec_store<HalfWord>(instr, h); }
+void exec_sb(const Instruction &instr, Hart &h) noexcept { exec_store<Byte>(instr, h); }
+
 } // namespace yarvs
