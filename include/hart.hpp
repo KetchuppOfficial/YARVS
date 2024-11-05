@@ -11,7 +11,7 @@ class Hart final
 {
 public:
 
-    Hart(Word entry_point) noexcept : pc_{entry_point} {}
+    Hart(DoubleWord entry_point) noexcept : pc_{entry_point} {}
 
     Word get_pc() const noexcept { return pc_; }
     void set_pc(DoubleWord pc) noexcept { pc_ = pc; }
@@ -22,7 +22,7 @@ public:
 private:
 
     RegFile reg_file_;
-    Word pc_;
+    DoubleWord pc_;
 };
 
 } // namespace yarvs
