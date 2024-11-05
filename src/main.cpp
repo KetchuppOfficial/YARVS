@@ -5,6 +5,7 @@
 #include <fmt/base.h>
 
 #include "elf_loader.hpp"
+#include "hart.hpp"
 #include "identifiers.hpp"
 
 int main(int argc, char **argv) try
@@ -21,6 +22,7 @@ int main(int argc, char **argv) try
     yarvs::LoadableImage segments{elf_path};
 
     auto i = 0;
+    fmt::println("Entry point: {:#x}", segments.get_entry_point());
     fmt::println("ELF file contains {} loadable segments", segments.size());
     for (auto &seg : segments)
     {
@@ -30,8 +32,8 @@ int main(int argc, char **argv) try
         fmt::println("    virtual address: {:#x}", seg.get_virtual_addr());
     }
 
-    // just to show that generated IDs are visible
-    fmt::println("{}", static_cast<int>(yarvs::InstrID::kADD));
+    yarvs::Hart hart{segments};
+    hart.run();
 
     return 0;
 }
