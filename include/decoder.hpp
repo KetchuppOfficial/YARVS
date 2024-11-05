@@ -38,6 +38,8 @@ public:
         throw std::invalid_argument{fmt::format("unknown instruction: {:#x}", raw_instr)};
     }
 
+private:
+
     static constexpr DoubleWord decode_s_imm(RawInstruction raw_instr) noexcept
     {
         return sext<12, DoubleWord>((get_bits<11, 7>(raw_instr))
@@ -59,8 +61,6 @@ public:
                                   | (mask_bits<19, 12>(raw_instr))
                                   | (get_bit<31>(raw_instr) << 20));
     }
-
-private:
 
     // both are generated from risc-v opcodes
     static const std::array<mask_type, 1 << kOpcodeBitLen> masks_;
