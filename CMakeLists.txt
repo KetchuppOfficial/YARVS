@@ -10,14 +10,16 @@ endif()
 find_package(fmt REQUIRED)
 find_package(CLI11 REQUIRED)
 find_package(elfio REQUIRED)
+find_package(GTest REQUIRED)
+find_package(Threads REQUIRED)
 find_package(Python REQUIRED COMPONENTS Interpreter)
+
+enable_testing()
 
 set(SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
 set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 set(CODEGEN_DIR ${PROJECT_SOURCE_DIR}/code-gen)
 set(BUILD_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include) # temporary set
-
-add_subdirectory(code-gen)
 
 add_executable(yarvs
     ${SOURCE_DIR}/main.cpp
@@ -39,3 +41,6 @@ target_include_directories(yarvs
 target_link_libraries(yarvs
     PRIVATE CLI11::CLI11 elfio::elfio fmt::fmt
 )
+
+add_subdirectory(code-gen)
+add_subdirectory(test)
