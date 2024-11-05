@@ -20,6 +20,7 @@ noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
 {
     auto &gprs = h.gprs();
     gprs.set_reg(instr.rd, bin_op(gprs.get_reg(instr.rs1), gprs.get_reg(instr.rs2)));
+    h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 void exec_add(const Instruction &instr, Hart &h) noexcept
@@ -65,6 +66,7 @@ noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
     auto &gprs = h.gprs();
     auto res = bin_op(gprs.get_reg(instr.rs1), gprs.get_reg(instr.rs2));
     gprs.set_reg(instr.rd, sext<32, DoubleWord>(static_cast<Word>(res)));
+    h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 void exec_addw(const Instruction &instr, Hart &h) noexcept
@@ -121,6 +123,7 @@ noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
 {
     auto &gprs = h.gprs();
     gprs.set_reg(instr.rd, bin_op(gprs.get_reg(instr.rs1), instr.imm));
+    h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 void exec_addi(const Instruction &instr, Hart &h) noexcept
@@ -160,11 +163,13 @@ void exec_lui(const Instruction &instr, Hart &h) noexcept
 {
     auto &gprs = h.gprs();
     gprs.set_reg(instr.rd, instr.imm);
+    h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 void exec_auipc(const Instruction &instr, Hart &h) noexcept
 {
     h.gprs().set_reg(instr.rd, h.get_pc() + instr.imm);
+    h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 // RV64I integer register-immediate instructions
@@ -176,6 +181,7 @@ noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
     auto &gprs = h.gprs();
     auto res = bin_op(gprs.get_reg(instr.rs1), instr.imm);
     gprs.set_reg(instr.rd, sext<32, DoubleWord>(static_cast<Word>(res)));
+    h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 void exec_addiw(const Instruction &instr, Hart &h) noexcept
@@ -247,6 +253,8 @@ noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
     auto &gprs = h.gprs();
     if (bin_op(gprs.get_reg(instr.rs1), gprs.get_reg(instr.rs2)))
         h.set_pc(h.get_pc() + instr.imm);
+    else
+        h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 void exec_beq(const Instruction &instr, Hart &h) noexcept
@@ -292,6 +300,7 @@ void exec_load(const Instruction &instr, Hart &h) noexcept
 {
     auto value = h.memory().load<T>(instr.rs1 + instr.imm);
     h.gprs().set_reg(instr.rd, sext<sizeof(T), DoubleWord>(value));
+    h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 void exec_ld(const Instruction &instr, Hart &h) noexcept { exec_load<DoubleWord>(instr, h); }
@@ -305,6 +314,7 @@ void exec_uload(const Instruction &instr, Hart &h) noexcept
 {
     auto value = h.memory().load<T>(instr.rs1 + instr.imm);
     h.gprs().set_reg(instr.rd, static_cast<DoubleWord>(value));
+    h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 void exec_lwu(const Instruction &instr, Hart &h) noexcept { exec_uload<Word>(instr, h); }
@@ -315,6 +325,7 @@ template<riscv_type T>
 void exec_store(const Instruction &instr, Hart &h) noexcept
 {
     h.memory().store(instr.rs1 + instr.imm, static_cast<T>(h.gprs().get_reg(instr.rs2)));
+    h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
 void exec_sd(const Instruction &instr, Hart &h) noexcept { exec_store<DoubleWord>(instr, h); }
