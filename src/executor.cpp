@@ -236,7 +236,7 @@ void exec_sraiw(const Instruction &instr, Hart &h) noexcept
 void exec_jal(const Instruction &instr, Hart &h) noexcept
 {
     h.gprs().set_reg(instr.rd, h.get_pc() + sizeof(RawInstruction));
-    h.set_pc(h.get_pc() + instr.rd);
+    h.set_pc(h.get_pc() + instr.imm);
 }
 
 void exec_jalr(const Instruction &instr, Hart &h) noexcept
