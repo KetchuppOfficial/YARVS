@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "reg_file.hpp"
+#include "memory/memory.hpp"
 
 namespace yarvs
 {
@@ -19,10 +20,14 @@ public:
     template<typename Self>
     auto &&gprs(this Self &&self) noexcept { return self.reg_file_; }
 
+    template<typename Self>
+    auto &&memory(this Self &&self) noexcept { return self.mem_; }
+
 private:
 
     RegFile reg_file_;
     DoubleWord pc_;
+    Memory mem_;
 };
 
 } // namespace yarvs
