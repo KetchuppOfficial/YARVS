@@ -250,7 +250,7 @@ template<std::predicate<DoubleWord, DoubleWord> F>
 void exec_cond_branch(const Instruction &instr, Hart &h, F bin_op)
 noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
 {
-    auto &gprs = h.gprs();
+    const auto &gprs = h.gprs();
     if (bin_op(gprs.get_reg(instr.rs1), gprs.get_reg(instr.rs2)))
         h.set_pc(h.get_pc() + instr.imm);
     else
