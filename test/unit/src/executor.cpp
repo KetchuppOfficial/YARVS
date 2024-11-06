@@ -77,6 +77,45 @@ TEST_F(ExecutorTest, Add)
     EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
 }
 
+TEST_F(ExecutorTest, Sub)
+{
+    constexpr std::array<RawInstruction, 5> kInstructions = {
+        0b0100000'00010'00001'000'00011'0110011, // sub x3, x1, x2 [rd != rs1 && rd != rs2]
+        0b0100000'00101'00100'000'00100'0110011, // sub x4, x4, x5 [rd == rs1]
+        0b0100000'00101'00000'000'00110'0110011, // sub x6, x0, x5 [rs1 == x0]
+        0b0100000'00000'00101'000'00111'0110011, // sub x7, x5, x0 [rs1 == x0]
+        0b0100000'01001'01000'000'01010'0110011  // sub x10, x8, x9 [overflow]
+    };
+
+    add_instructions(kInstructions);
+
+    hart.gprs().set_reg(1, 15);
+    hart.gprs().set_reg(2, 13);
+    hart.gprs().set_reg(4, 42);
+    hart.gprs().set_reg(5, 7);
+    hart.gprs().set_reg(8, 1);
+    hart.gprs().set_reg(9, 2);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), 15);
+    EXPECT_EQ(hart.gprs().get_reg(2), 13);
+    EXPECT_EQ(hart.gprs().get_reg(3), 2);
+    EXPECT_EQ(hart.gprs().get_reg(4), 35);
+    EXPECT_EQ(hart.gprs().get_reg(5), 7);
+    EXPECT_EQ(hart.gprs().get_reg(6), -7);
+    EXPECT_EQ(hart.gprs().get_reg(7), 7);
+    EXPECT_EQ(hart.gprs().get_reg(8), 1);
+    EXPECT_EQ(hart.gprs().get_reg(9), 2);
+    EXPECT_EQ(hart.gprs().get_reg(10), -1);
+
+    for (auto i : std::views::iota(11uz, RegFile::kNRegs))
+        EXPECT_EQ(hart.gprs().get_reg(i), 0) << std::format("x{}", i);
+
+    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
+}
+
 TEST_F(ExecutorTest, Addi)
 {
     constexpr std::array<RawInstruction, 7> kInstructions = {
