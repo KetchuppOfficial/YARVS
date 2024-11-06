@@ -9,13 +9,11 @@ set_target_properties(unit_tests PROPERTIES
 )
 
 target_link_libraries(unit_tests
-    PRIVATE GTest::GTest
-    PRIVATE GTest::gtest_main
-    PRIVATE Threads::Threads
+    PRIVATE yarvs-lib GTest::GTest GTest::gtest_main Threads::Threads
 )
 
 target_include_directories(unit_tests
-    PRIVATE ${INCLUDE_DIR}
+    PRIVATE ${INCLUDE_DIR} ${BUILD_INCLUDE_DIR}
 )
 
 include(GoogleTest)
