@@ -298,8 +298,9 @@ void exec_bgeu(const Instruction &instr, Hart &h) noexcept
 template<riscv_type T>
 void exec_load(const Instruction &instr, Hart &h) noexcept
 {
-    auto value = h.memory().load<T>(instr.rs1 + instr.imm);
-    h.gprs().set_reg(instr.rd, sext<sizeof(T), DoubleWord>(value));
+    auto &gprs = h.gprs();
+    auto value = h.memory().load<T>(gprs.get_reg(instr.rs1) + instr.imm);
+    gprs.set_reg(instr.rd, sext<kNBits<T>, DoubleWord>(value));
     h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
@@ -312,8 +313,9 @@ template<typename T>
 requires riscv_type<T> && (!std::is_same_v<T, DoubleWord>)
 void exec_uload(const Instruction &instr, Hart &h) noexcept
 {
-    auto value = h.memory().load<T>(instr.rs1 + instr.imm);
-    h.gprs().set_reg(instr.rd, static_cast<DoubleWord>(value));
+    auto &gprs = h.gprs();
+    auto value = h.memory().load<T>(gprs.get_reg(instr.rs1) + instr.imm);
+    gprs.set_reg(instr.rd, static_cast<DoubleWord>(value));
     h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
@@ -324,7 +326,8 @@ void exec_lbu(const Instruction &instr, Hart &h) noexcept { exec_uload<Byte>(ins
 template<riscv_type T>
 void exec_store(const Instruction &instr, Hart &h) noexcept
 {
-    h.memory().store(instr.rs1 + instr.imm, static_cast<T>(h.gprs().get_reg(instr.rs2)));
+    auto &gprs = h.gprs();
+    h.memory().store(gprs.get_reg(instr.rs1) + instr.imm, static_cast<T>(gprs.get_reg(instr.rs2)));
     h.set_pc(h.get_pc() + sizeof(RawInstruction));
 }
 
