@@ -1,12 +1,10 @@
 set(BUILD_CODEGEN_DIR ${PROJECT_BINARY_DIR}/code-gen)
-set(BUILD_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
-set(BUILD_SRC_DIR ${PROJECT_BINARY_DIR}/src)
 
 file(COPY ${CODEGEN_DIR}/decoder-generator.py DESTINATION ${BUILD_CODEGEN_DIR})
 file(COPY ${CODEGEN_DIR}/requirements.txt DESTINATION ${BUILD_CODEGEN_DIR})
 
 file(MAKE_DIRECTORY ${BUILD_INCLUDE_DIR})
-file(MAKE_DIRECTORY ${BUILD_SRC_DIR})
+file(MAKE_DIRECTORY ${BUILD_SOURCE_DIR})
 
 set(RISCV_YAML ${PROJECT_SOURCE_DIR}/riscv-opcodes/instr_dict.yaml)
 
@@ -51,7 +49,7 @@ add_custom_command(
     DEPENDS ${CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML} ${BUILD_CODEGEN_DIR}/.venv
 )
 
-set(DECODER ${BUILD_SRC_DIR}/decoder.cpp)
+set(DECODER ${BUILD_SOURCE_DIR}/decoder.cpp)
 
 add_custom_command(
     COMMENT "Generating decoder"
