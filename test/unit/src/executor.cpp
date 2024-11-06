@@ -138,7 +138,34 @@ TEST_F(ExecutorTest, Load_Word)
 
     EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
 
-    EXPECT_EQ(hart.memory().load<Word>(kAddr + sizeof(Word)), kValue);
+    EXPECT_EQ(hart.memory().load<Word>(kAddr + 4), kValue);
+}
+
+TEST_F(ExecutorTest, Store_Word)
+{
+    constexpr auto kAddr = kEntry + 0x1000;
+    constexpr Word kValue = 0x7fffffff;
+
+    // sw x2, 4(x1)
+    hart.memory().store(kEntry, RawInstruction{0b0000000'00010'00001'010'00100'0100011});
+    hart.gprs().set_reg(1, kAddr);
+    hart.gprs().set_reg(2, kValue);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kAddr);
+    EXPECT_EQ(hart.gprs().get_reg(2), kValue);
+
+    for (auto i : std::views::iota(3uz, RegFile::kNRegs))
+    {
+        auto reg = hart.gprs().get_reg(i);
+        EXPECT_EQ(reg, 0) << std::format("x{} == {}", i, reg);
+    }
+
+    EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
+
+    EXPECT_EQ(hart.memory().load<Word>(kAddr + 4), kValue);
 }
 
 TEST_F(ExecutorTest, Auipc_Zext)
