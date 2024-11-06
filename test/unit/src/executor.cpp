@@ -3,7 +3,6 @@
 
 #include <gtest/gtest.h>
 
-#include "bits_manipulation.hpp"
 #include "common.hpp"
 #include "hart.hpp"
 #include "reg_file.hpp"
@@ -15,7 +14,7 @@ class ExecutorTest : public testing::Test
 protected:
 
     static constexpr RawInstruction kEbreak = 0b00000000000100000000000001110011;
-    static constexpr DoubleWord kEntry = 0x42;
+    static constexpr DoubleWord kEntry = 0x42000;
 
     ExecutorTest() : hart{kEntry}
     {
@@ -140,4 +139,42 @@ TEST_F(ExecutorTest, Load_Word)
     EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
 
     EXPECT_EQ(hart.memory().load<Word>(kAddr + sizeof(Word)), kValue);
+}
+
+TEST_F(ExecutorTest, Auipc_Zext)
+{
+    // auipc x1, 4
+    hart.memory().store(kEntry, RawInstruction{0b00000000000000000100'00001'0010111});
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kEntry + (DoubleWord{4} << 12));
+
+    for (auto i : std::views::iota(2uz, RegFile::kNRegs))
+    {
+        auto reg = hart.gprs().get_reg(i);
+        EXPECT_EQ(reg, 0) << std::format("x{} == {}", i, reg);
+    }
+
+    EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
+}
+
+TEST_F(ExecutorTest, Auipc_Sext)
+{
+    // auipc x1, -4
+    hart.memory().store(kEntry, RawInstruction{0b11111111111111111100'00001'0010111});
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kEntry - (DoubleWord{4} << 12));
+
+    for (auto i : std::views::iota(2uz, RegFile::kNRegs))
+    {
+        auto reg = hart.gprs().get_reg(i);
+        EXPECT_EQ(reg, 0) << std::format("x{} == {}", i, reg);
+    }
+
+    EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
 }
