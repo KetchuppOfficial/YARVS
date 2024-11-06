@@ -178,3 +178,41 @@ TEST_F(ExecutorTest, Auipc_Sext)
 
     EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
 }
+
+TEST_F(ExecutorTest, Lui_Zext)
+{
+    // lui x1, 1
+    hart.memory().store(kEntry, RawInstruction{0b00000000000000000001'00001'0110111});
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), DoubleWord{1} << 12);
+
+    for (auto i : std::views::iota(2uz, RegFile::kNRegs))
+    {
+        auto reg = hart.gprs().get_reg(i);
+        EXPECT_EQ(reg, 0) << std::format("x{} == {}", i, reg);
+    }
+
+    EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
+}
+
+TEST_F(ExecutorTest, Lui_Sext)
+{
+    // lui x1, -1
+    hart.memory().store(kEntry, RawInstruction{0b11111111111111111111'00001'0110111});
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), ~DoubleWord{0xfff});
+
+    for (auto i : std::views::iota(2uz, RegFile::kNRegs))
+    {
+        auto reg = hart.gprs().get_reg(i);
+        EXPECT_EQ(reg, 0) << std::format("x{} == {}", i, reg);
+    }
+
+    EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
+}
