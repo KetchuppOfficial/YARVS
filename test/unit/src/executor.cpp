@@ -57,7 +57,7 @@ TEST_F(ExecutorTest, Add_Two_Regs_Put_In_Third)
     for (auto i : std::views::iota(4uz, RegFile::kNRegs))
     {
         auto reg = hart.gprs().get_reg(i);
-        EXPECT_EQ(reg, 0) << std::format("x{} == {:#x}", i, reg);
+        EXPECT_EQ(reg, 0) << std::format("x{}", i);
     }
 
     EXPECT_EQ(hart.get_pc(), kEntry + kInstrSize);
@@ -80,7 +80,7 @@ TEST_F(ExecutorTest, Add_Two_Regs_Put_In_First)
     for (auto i : std::views::iota(3uz, RegFile::kNRegs))
     {
         auto reg = hart.gprs().get_reg(i);
-        EXPECT_EQ(reg, 0) << std::format("x{} == {:#x}", i, reg);
+        EXPECT_EQ(reg, 0) << std::format("x{}", i);
     }
 
     EXPECT_EQ(hart.get_pc(), kEntry + kInstrSize);
@@ -103,7 +103,7 @@ TEST_F(ExecutorTest, Add_With_X0)
     for (auto i : std::views::iota(3uz, RegFile::kNRegs))
     {
         auto reg = hart.gprs().get_reg(i);
-        EXPECT_EQ(reg, 0) << std::format("x{} == {:#x}", i, reg);
+        EXPECT_EQ(reg, 0) << std::format("x{}", i);
     }
 
     EXPECT_EQ(hart.get_pc(), kEntry + kInstrSize);
@@ -129,10 +129,73 @@ TEST_F(ExecutorTest, Add_With_Overflow)
     for (auto i : std::views::iota(4uz, RegFile::kNRegs))
     {
         auto reg = hart.gprs().get_reg(i);
-        EXPECT_EQ(reg, 0) << std::format("x{} == {:#x}", i, reg);
+        EXPECT_EQ(reg, 0) << std::format("x{}", i);
     }
 
     EXPECT_EQ(hart.get_pc(), kEntry + kInstrSize);
+}
+
+TEST_F(ExecutorTest, Load_Byte)
+{
+    constexpr auto kAddr = kEntry + 0x1000;
+    constexpr std::array<Byte, 2> kValues = {0x7f, 0xff};
+    constexpr std::array<RawInstruction, 2> kInstructions = {
+        0b000000000000'00001'000'00010'0000011, // lb x2, 0(x1)
+        0b000000000001'00001'000'00011'0000011  // lb x3, 1(x1)
+    };
+
+    add_instructions(kInstructions);
+
+    hart.memory().store(kAddr, kValues.begin(), kValues.end());
+    hart.gprs().set_reg(1, kAddr);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kAddr);
+    EXPECT_EQ(hart.gprs().get_reg(2), DoubleWord{0x00'00'00'00'00'00'00'7f});
+    EXPECT_EQ(hart.gprs().get_reg(3), DoubleWord{0xff'ff'ff'ff'ff'ff'ff'ff});
+
+    for (auto i : std::views::iota(kValues.size() + 2, RegFile::kNRegs))
+    {
+        auto reg = hart.gprs().get_reg(i);
+        EXPECT_EQ(reg, 0) << std::format("x{}", i);
+    }
+
+    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
+
+    EXPECT_EQ(hart.memory().load<Byte>(kAddr), kValues[0]);
+    EXPECT_EQ(hart.memory().load<Byte>(kAddr + sizeof(Byte)), kValues[1]);
+}
+
+TEST_F(ExecutorTest, Load_HalfWord)
+{
+    constexpr auto kAddr = kEntry + 0x1000;
+    constexpr std::array<HalfWord, 2> kValues = {0x7fff, 0xffff};
+    constexpr std::array<RawInstruction, 2> kInstructions = {
+        0b000000000000'00001'001'00010'0000011, // lh x2, 0(x1)
+        0b000000000010'00001'001'00011'0000011  // lh x3, 2(x1)
+    };
+
+    add_instructions(kInstructions);
+
+    hart.memory().store(kAddr, kValues.begin(), kValues.end());
+    hart.gprs().set_reg(1, kAddr);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kAddr);
+    EXPECT_EQ(hart.gprs().get_reg(2), DoubleWord{0x0000'0000'0000'7fff});
+    EXPECT_EQ(hart.gprs().get_reg(3), DoubleWord{0xffff'ffff'ffff'ffff});
+
+    for (auto i : std::views::iota(kValues.size() + 2, RegFile::kNRegs))
+        EXPECT_EQ(hart.gprs().get_reg(i), 0) << std::format("x{}", i);
+
+    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
+
+    EXPECT_EQ(hart.memory().load<HalfWord>(kAddr), kValues[0]);
+    EXPECT_EQ(hart.memory().load<HalfWord>(kAddr + sizeof(HalfWord)), kValues[1]);
 }
 
 TEST_F(ExecutorTest, Load_Word)
@@ -140,7 +203,7 @@ TEST_F(ExecutorTest, Load_Word)
     constexpr auto kAddr = kEntry + 0x1000;
     constexpr std::array<Word, 2> kValues = {0x7fffffff, 0xffffffff};
     constexpr std::array<RawInstruction, 2> kInstructions = {
-        0b000000000000'00001'010'00010'0000011, // lw x2, x1
+        0b000000000000'00001'010'00010'0000011, // lw x2, 0(x1)
         0b000000000100'00001'010'00011'0000011  // lw x3, 4(x1)
     };
 
@@ -156,32 +219,30 @@ TEST_F(ExecutorTest, Load_Word)
     EXPECT_EQ(hart.gprs().get_reg(2), DoubleWord{0x00000000'7fffffff});
     EXPECT_EQ(hart.gprs().get_reg(3), DoubleWord{0xffffffff'ffffffff});
 
-    for (auto i : std::views::iota(4uz, RegFile::kNRegs))
-    {
-        auto reg = hart.gprs().get_reg(i);
-        EXPECT_EQ(reg, 0) << std::format("x{}", i);
-    }
+    for (auto i : std::views::iota(kValues.size() + 2, RegFile::kNRegs))
+        EXPECT_EQ(hart.gprs().get_reg(i), 0) << std::format("x{}", i);
 
     EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
 
     EXPECT_EQ(hart.memory().load<Word>(kAddr), kValues[0]);
-    EXPECT_EQ(hart.memory().load<Word>(kAddr + 4), kValues[1]);
+    EXPECT_EQ(hart.memory().load<Word>(kAddr + sizeof(Word)), kValues[1]);
 }
 
-TEST_F(ExecutorTest, Store_Word)
+TEST_F(ExecutorTest, Load_DoubleWord)
 {
     constexpr auto kAddr = kEntry + 0x1000;
-    constexpr std::array<Word, 2> kValues = {0x7fffffff, 0xffffffff};
+    constexpr std::array<DoubleWord, 2> kValues = {
+        0x7fffffffffffffff, 0xffffffffffffffff
+    };
     constexpr std::array<RawInstruction, 2> kInstructions = {
-        0b0000000'00010'00001'010'00000'0100011, // sw x2, x1
-        0b0000000'00011'00001'010'00100'0100011  // sw x3, 4(x1)
+        0b000000000000'00001'011'00010'0000011, // ld x2, 0(x1)
+        0b000000001000'00001'011'00011'0000011  // ld x3, 8(x1)
     };
 
     add_instructions(kInstructions);
 
+    hart.memory().store(kAddr, kValues.begin(), kValues.end());
     hart.gprs().set_reg(1, kAddr);
-    hart.gprs().set_reg(2, kValues[0]);
-    hart.gprs().set_reg(3, kValues[1]);
 
     hart.run();
 
@@ -190,16 +251,166 @@ TEST_F(ExecutorTest, Store_Word)
     EXPECT_EQ(hart.gprs().get_reg(2), kValues[0]);
     EXPECT_EQ(hart.gprs().get_reg(3), kValues[1]);
 
-    for (auto i : std::views::iota(4uz, RegFile::kNRegs))
-    {
-        auto reg = hart.gprs().get_reg(i);
-        EXPECT_EQ(reg, 0) << std::format("x{} == {:#x}", i, reg);
-    }
+    for (auto i : std::views::iota(kValues.size() + 2, RegFile::kNRegs))
+        EXPECT_EQ(hart.gprs().get_reg(i), 0) << std::format("x{}", i);
 
-    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() *  kInstrSize);
+    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
+
+    EXPECT_EQ(hart.memory().load<DoubleWord>(kAddr), kValues[0]);
+    EXPECT_EQ(hart.memory().load<DoubleWord>(kAddr + sizeof(DoubleWord)), kValues[1]);
+}
+
+TEST_F(ExecutorTest, Store_Byte)
+{
+    constexpr auto kAddr = kEntry + 0x1000;
+    constexpr std::array<Byte, 4> kValues = {
+        0x7f, 0xff, 0x70, 0xf0
+    };
+    constexpr std::array<RawInstruction, 4> kInstructions = {
+        0b0000000'00010'00001'000'00000'0100011, // sb x2, 0(x1)
+        0b0000000'00011'00001'000'00001'0100011, // sb x3, 1(x1)
+        0b0000001'00100'00001'000'00000'0100011, // sb x4, 32(x1)
+        0b0000001'00101'00001'000'00001'0100011  // sb x5, 33(x1)
+    };
+
+    add_instructions(kInstructions);
+
+    hart.gprs().set_reg(1, kAddr);
+    for (auto [i, v] : std::views::enumerate(kValues))
+        hart.gprs().set_reg(i + 2, v);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kAddr);
+
+    for (auto [i, v] : std::views::enumerate(kValues))
+        EXPECT_EQ(hart.gprs().get_reg(i + 2), v) << std::format("x{}", i);
+
+    for (auto i : std::views::iota(kValues.size() + 2, RegFile::kNRegs))
+        EXPECT_EQ(hart.gprs().get_reg(i), 0) << std::format("x{}", i);
+
+    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
+
+    EXPECT_EQ(hart.memory().load<Byte>(kAddr), kValues[0]);
+    EXPECT_EQ(hart.memory().load<Byte>(kAddr + sizeof(Byte)), kValues[1]);
+    EXPECT_EQ(hart.memory().load<Byte>(kAddr + 32), kValues[2]);
+    EXPECT_EQ(hart.memory().load<Byte>(kAddr + 32 + sizeof(Byte)), kValues[3]);
+}
+
+TEST_F(ExecutorTest, Store_HalfWord)
+{
+    constexpr auto kAddr = kEntry + 0x1000;
+    constexpr std::array<HalfWord, 4> kValues = {
+        0x7fff, 0xffff, 0x7ff0, 0xfff0
+    };
+    constexpr std::array<RawInstruction, 4> kInstructions = {
+        0b0000000'00010'00001'001'00000'0100011, // sh x2, 0(x1)
+        0b0000000'00011'00001'001'00010'0100011, // sh x3, 2(x1)
+        0b0000001'00100'00001'001'00000'0100011, // sh x4, 32(x1)
+        0b0000001'00101'00001'001'00010'0100011  // sh x5, 34(x1)
+    };
+
+    add_instructions(kInstructions);
+
+    hart.gprs().set_reg(1, kAddr);
+    for (auto [i, v] : std::views::enumerate(kValues))
+        hart.gprs().set_reg(i + 2, v);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kAddr);
+
+    for (auto [i, v] : std::views::enumerate(kValues))
+        EXPECT_EQ(hart.gprs().get_reg(i + 2), v) << std::format("x{}", i);
+
+    for (auto i : std::views::iota(kValues.size() + 2, RegFile::kNRegs))
+        EXPECT_EQ(hart.gprs().get_reg(i), 0) << std::format("x{}", i);
+
+    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
+
+    EXPECT_EQ(hart.memory().load<HalfWord>(kAddr), kValues[0]);
+    EXPECT_EQ(hart.memory().load<HalfWord>(kAddr + sizeof(HalfWord)), kValues[1]);
+    EXPECT_EQ(hart.memory().load<HalfWord>(kAddr + 32), kValues[2]);
+    EXPECT_EQ(hart.memory().load<HalfWord>(kAddr + 32 + sizeof(HalfWord)), kValues[3]);
+}
+
+TEST_F(ExecutorTest, Store_Word)
+{
+    constexpr auto kAddr = kEntry + 0x1000;
+    constexpr std::array<Word, 4> kValues = {
+        0x7fffffff, 0xffffffff, 0x7ffffff0, 0xfffffff0
+    };
+    constexpr std::array<RawInstruction, 4> kInstructions = {
+        0b0000000'00010'00001'010'00000'0100011, // sw x2, 0(x1)
+        0b0000000'00011'00001'010'00100'0100011, // sw x3, 4(x1)
+        0b0000001'00100'00001'010'00000'0100011, // sw x4, 32(x1)
+        0b0000001'00101'00001'010'00100'0100011  // sw x5, 36(x1)
+    };
+
+    add_instructions(kInstructions);
+
+    hart.gprs().set_reg(1, kAddr);
+    for (auto [i, v] : std::views::enumerate(kValues))
+        hart.gprs().set_reg(i + 2, v);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kAddr);
+
+    for (auto [i, v] : std::views::enumerate(kValues))
+        EXPECT_EQ(hart.gprs().get_reg(i + 2), v) << std::format("x{}", i);
+
+    for (auto i : std::views::iota(kValues.size() + 2, RegFile::kNRegs))
+        EXPECT_EQ(hart.gprs().get_reg(i), 0) << std::format("x{}", i);
+
+    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
 
     EXPECT_EQ(hart.memory().load<Word>(kAddr), kValues[0]);
-    EXPECT_EQ(hart.memory().load<Word>(kAddr + 4), kValues[1]);
+    EXPECT_EQ(hart.memory().load<Word>(kAddr + sizeof(Word)), kValues[1]);
+    EXPECT_EQ(hart.memory().load<Word>(kAddr + 32), kValues[2]);
+    EXPECT_EQ(hart.memory().load<Word>(kAddr + 32 + sizeof(Word)), kValues[3]);
+}
+
+TEST_F(ExecutorTest, Store_DoubleWord)
+{
+    constexpr auto kAddr = kEntry + 0x1000;
+    constexpr std::array<DoubleWord, 4> kValues = {
+        0x7fffffffffffffff, 0xffffffffffffffff,
+        0x7ffffffffffffff0, 0xfffffffffffffff0
+    };
+    constexpr std::array<RawInstruction, 4> kInstructions = {
+        0b0000000'00010'00001'011'00000'0100011, // sd x2, 0(x1)
+        0b0000000'00011'00001'011'01000'0100011, // sd x3, 8(x1)
+        0b0000001'00100'00001'011'00000'0100011, // sd x4, 32(x1)
+        0b0000001'00101'00001'011'01000'0100011  // sd x5, 40(x1)
+    };
+
+    add_instructions(kInstructions);
+
+    hart.gprs().set_reg(1, kAddr);
+    for (auto [i, v] : std::views::enumerate(kValues))
+        hart.gprs().set_reg(i + 2, v);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kAddr);
+
+    for (auto [i, v] : std::views::enumerate(kValues))
+        EXPECT_EQ(hart.gprs().get_reg(i + 2), v) << std::format("x{}", i);
+
+    for (auto i : std::views::iota(kValues.size() + 2, RegFile::kNRegs))
+        EXPECT_EQ(hart.gprs().get_reg(i), 0) << std::format("x{}", i);
+
+    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
+
+    EXPECT_EQ(hart.memory().load<DoubleWord>(kAddr), kValues[0]);
+    EXPECT_EQ(hart.memory().load<DoubleWord>(kAddr + sizeof(DoubleWord)), kValues[1]);
+    EXPECT_EQ(hart.memory().load<DoubleWord>(kAddr + 32), kValues[2]);
+    EXPECT_EQ(hart.memory().load<DoubleWord>(kAddr + 32 + sizeof(DoubleWord)), kValues[3]);
 }
 
 TEST_F(ExecutorTest, Auipc)
@@ -220,7 +431,7 @@ TEST_F(ExecutorTest, Auipc)
     for (auto i : std::views::iota(3uz, RegFile::kNRegs))
     {
         auto reg = hart.gprs().get_reg(i);
-        EXPECT_EQ(reg, 0) << std::format("x{} == {:#x}", i, reg);
+        EXPECT_EQ(reg, 0) << std::format("x{}", i);
     }
 
     EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
@@ -244,7 +455,7 @@ TEST_F(ExecutorTest, Lui)
     for (auto i : std::views::iota(3uz, RegFile::kNRegs))
     {
         auto reg = hart.gprs().get_reg(i);
-        EXPECT_EQ(reg, 0) << std::format("x{} == {:#x}", i, reg);
+        EXPECT_EQ(reg, 0) << std::format("x{}", i);
     }
 
     EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
