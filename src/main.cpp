@@ -6,7 +6,6 @@
 
 #include "elf_loader.hpp"
 #include "hart.hpp"
-#include "identifiers.hpp"
 
 int main(int argc, char **argv) try
 {
