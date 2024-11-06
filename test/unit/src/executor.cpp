@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include "bits_manipulation.hpp"
 #include "common.hpp"
 #include "hart.hpp"
 #include "reg_file.hpp"
@@ -112,4 +113,31 @@ TEST_F(ExecutorTest, Add_With_Overflow)
     }
 
     EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
+}
+
+TEST_F(ExecutorTest, Load_Word)
+{
+    constexpr auto kAddr = kEntry + 0x1000;
+    constexpr Word kValue = 0x7fffffff;
+
+    // ld x2, 4(x1)
+    hart.memory().store(kEntry, RawInstruction{0b000000000100'00001'010'00010'0000011});
+    hart.memory().store<Word>(kAddr + sizeof(Word), kValue);
+    hart.gprs().set_reg(1, kAddr);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kAddr);
+    EXPECT_EQ(hart.gprs().get_reg(2), kValue);
+
+    for (auto i : std::views::iota(3uz, RegFile::kNRegs))
+    {
+        auto reg = hart.gprs().get_reg(i);
+        EXPECT_EQ(reg, 0) << std::format("x{} == {}", i, reg);
+    }
+
+    EXPECT_EQ(hart.get_pc(), kEntry + sizeof(RawInstruction));
+
+    EXPECT_EQ(hart.memory().load<Word>(kAddr + sizeof(Word)), kValue);
 }
