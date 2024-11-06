@@ -2,7 +2,6 @@
 #define INCLUDE_HART_HPP
 
 #include "common.hpp"
-#include "elf_loader.hpp"
 #include "reg_file.hpp"
 #include "decoder.hpp"
 #include "executor.hpp"
@@ -11,27 +10,18 @@
 namespace yarvs
 {
 
+class LoadableImage;
+
 class Hart final
 {
 public:
 
-    Hart(const LoadableImage &image) : pc_{image.get_entry_point()}
-    {
-        for (auto &segment : image)
-            mem_.store(segment.get_virtual_addr(), segment.begin(), segment.end());
-    }
+    explicit Hart(DoubleWord pc) : pc_{pc} {}
+    explicit Hart(const LoadableImage &image);
 
-    void run()
-    {
-        for (;;)
-        {
-            auto raw_instr = mem_.load<RawInstruction>(pc_);
-            Instruction instr = decoder_.decode(raw_instr);
-            if (instr.id == InstrID::kEBREAK)
-                break;
-            executor_.execute(instr, *this);
-        }
-    }
+    void load_segments(const LoadableImage &image);
+    void run();
+    void clear();
 
     Word get_pc() const noexcept { return pc_; }
     void set_pc(DoubleWord pc) noexcept { pc_ = pc; }
@@ -46,7 +36,6 @@ private:
 
     RegFile reg_file_;
     DoubleWord pc_;
-    DoubleWord min_pc_ = 0, max_pc_ = 0;
     Memory mem_;
     [[no_unique_address]] Decoder decoder_;
     [[no_unique_address]] Executor executor_;
