@@ -39,6 +39,11 @@ public:
 
 private:
 
+    static constexpr DoubleWord decode_i_imm(RawInstruction raw_instr) noexcept
+    {
+        return sext<12, DoubleWord>(get_bits<31, 20>(raw_instr));
+    }
+
     static constexpr DoubleWord decode_s_imm(RawInstruction raw_instr) noexcept
     {
         return sext<12, DoubleWord>((get_bits<11, 7>(raw_instr))
@@ -51,6 +56,11 @@ private:
                                   | (get_bits<30, 25>(raw_instr) << 5)
                                   | (get_bit<7>(raw_instr) << 11)
                                   | (get_bit<31>(raw_instr) << 12));
+    }
+
+    static constexpr DoubleWord decode_u_imm(RawInstruction raw_instr) noexcept
+    {
+        return sext<32, DoubleWord>(mask_bits<31, 12>(raw_instr));
     }
 
     static constexpr DoubleWord decode_j_imm(RawInstruction raw_instr) noexcept

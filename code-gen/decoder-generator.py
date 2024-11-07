@@ -98,15 +98,15 @@ def generate_one_instr(id : str, info : dict) -> str:
     if "rd" in vars:
         out += ",\n" + " " * 12 + ".rd = get_bits_r<11, 7, Byte>(raw_instr)"
 
-    if "imm12" in vars: # i-immediate
-        out += ",\n" + " " * 12 + ".imm = sext<12, DoubleWord>(get_bits<31, 20>(raw_instr))"
-    elif "imm12hi" in vars and "imm12lo" in vars: # s-immediate
+    if "imm12" in vars:
+        out += ",\n" + " " * 12 + ".imm = decode_i_imm(raw_instr)"
+    elif "imm12hi" in vars and "imm12lo" in vars:
         out += ",\n" + " " * 12 + ".imm = decode_s_imm(raw_instr)"
-    elif "bimm12hi" in vars and "bimm12lo" in vars: # b-immediate
+    elif "bimm12hi" in vars and "bimm12lo" in vars:
         out += ",\n" + " " * 12 + ".imm = decode_b_imm(raw_instr)"
-    elif "imm20" in vars: # u-immediate
-        out += ",\n" + " " * 12 + ".imm = sext<32, DoubleWord>(mask_bits<31, 12>(raw_instr))"
-    elif "jimm20" in vars: # j-immediate
+    elif "imm20" in vars:
+        out += ",\n" + " " * 12 + ".imm = decode_u_imm(raw_instr)"
+    elif "jimm20" in vars:
         out += ",\n" + " " * 12 + ".imm = decode_j_imm(raw_instr)"
 
     out += "\n" + " " * 8 + "};\n" + " " * 4 + "}}"
