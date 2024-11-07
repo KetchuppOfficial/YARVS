@@ -7,7 +7,11 @@ namespace yarvs
 Hart::Hart(const LoadableImage &image) : pc_{image.get_entry_point()}
 {
     load_segments(image);
+    #if 0 // temporary workaround caused by absence of address translation
     reg_file_.set_reg(2, kStackAddr); // stack pointer
+    #else
+    reg_file_.set_reg(2, 0x1000); // stack pointer
+    #endif
 }
 
 void Hart::load_segments(const LoadableImage &image)
