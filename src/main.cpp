@@ -19,18 +19,6 @@ int main(int argc, char **argv) try
     CLI11_PARSE(app, argc, argv);
 
     yarvs::LoadableImage segments{elf_path};
-
-    auto i = 0;
-    fmt::println("Entry point: {:#x}", segments.get_entry_point());
-    fmt::println("ELF file contains {} loadable segments", segments.size());
-    for (auto &seg : segments)
-    {
-        fmt::println("Segment {}", i++);
-        fmt::println("    file size: {} bytes", seg.get_file_size());
-        fmt::println("    memory size: {} bytes", seg.get_memory_size());
-        fmt::println("    virtual address: {:#x}", seg.get_virtual_addr());
-    }
-
     yarvs::Hart hart{segments};
     hart.run();
 
