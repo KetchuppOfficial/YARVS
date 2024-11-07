@@ -61,16 +61,16 @@ TEST(Bits_Manipulation, Get_Bits_R)
               uint32_t{0b10110110111});
 }
 
-TEST(Bits_Manipulation, Get_Bit)
+TEST(Bits_Manipulation, Mask_Bit)
 {
     // first bit
-    EXPECT_EQ((yarvs::get_bit<0>(uint16_t{0b1011011011101010})), uint16_t{0});
+    EXPECT_EQ((yarvs::mask_bit<0>(uint16_t{0b1011011011101010})), uint16_t{0});
 
     // last bit
-    EXPECT_EQ((yarvs::get_bit<15>(uint16_t{0b1011011011101010})), uint16_t{1});
+    EXPECT_EQ((yarvs::mask_bit<15>(uint16_t{0b1011011011101010})), uint16_t{1 << 15});
 
     // middle bit
-    EXPECT_EQ((yarvs::get_bit<7>(uint16_t{0b1011011011101010})), uint16_t{1});
+    EXPECT_EQ((yarvs::mask_bit<7>(uint16_t{0b1011011011101010})), uint16_t{1 << 7});
 }
 
 TEST(Bits_Manipulation, Sext)

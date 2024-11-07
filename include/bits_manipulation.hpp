@@ -80,11 +80,11 @@ constexpr R get_bits_r(T num) noexcept
  *                       n
  */
 template<std::size_t n, std::unsigned_integral T>
-constexpr T get_bit(T num) noexcept
+constexpr T mask_bit(T num) noexcept
 {
     static_assert(n < kNBits<T>);
 
-    return (num & (T{1} << n)) >> n;
+    return num & (T{1} << n);
 }
 
 template<std::unsigned_integral T>

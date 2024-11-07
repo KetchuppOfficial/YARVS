@@ -47,15 +47,15 @@ private:
     static constexpr DoubleWord decode_s_imm(RawInstruction raw_instr) noexcept
     {
         return sext<12, DoubleWord>((get_bits<11, 7>(raw_instr))
-                                  | (get_bits<31, 25>(raw_instr) << 5));
+                                  | (mask_bits<31, 25>(raw_instr) >> 20));
     }
 
     static constexpr DoubleWord decode_b_imm(RawInstruction raw_instr) noexcept
     {
-        return sext<13, DoubleWord>((get_bits<11, 8>(raw_instr) << 1)
-                                  | (get_bits<30, 25>(raw_instr) << 5)
-                                  | (get_bit<7>(raw_instr) << 11)
-                                  | (get_bit<31>(raw_instr) << 12));
+        return sext<13, DoubleWord>((mask_bits<11, 8>(raw_instr) >> 7)
+                                  | (mask_bits<30, 25>(raw_instr) >> 20)
+                                  | (mask_bit<7>(raw_instr) << 4)
+                                  | (mask_bit<31>(raw_instr) >> 19));
     }
 
     static constexpr DoubleWord decode_u_imm(RawInstruction raw_instr) noexcept
@@ -65,10 +65,10 @@ private:
 
     static constexpr DoubleWord decode_j_imm(RawInstruction raw_instr) noexcept
     {
-        return sext<21, DoubleWord>((get_bits<30, 21>(raw_instr) << 1)
-                                  | (get_bit<20>(raw_instr) << 11)
+        return sext<21, DoubleWord>((mask_bits<30, 21>(raw_instr) >> 20)
+                                  | (mask_bit<20>(raw_instr) >> 9)
                                   | (mask_bits<19, 12>(raw_instr))
-                                  | (get_bit<31>(raw_instr) << 20));
+                                  | (mask_bit<31>(raw_instr) >> 11));
     }
 
     // both are generated from risc-v opcodes
