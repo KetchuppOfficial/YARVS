@@ -34,6 +34,8 @@ public:
 
 private:
 
+    static constexpr DoubleWord kStackAddr = 0x7ffe49b14000;
+
     RegFile reg_file_;
     DoubleWord pc_;
     Memory mem_;

@@ -4,7 +4,11 @@
 namespace yarvs
 {
 
-Hart::Hart(const LoadableImage &image) : pc_{image.get_entry_point()} { load_segments(image); }
+Hart::Hart(const LoadableImage &image) : pc_{image.get_entry_point()}
+{
+    load_segments(image);
+    reg_file_.set_reg(2, kStackAddr); // stack pointer
+}
 
 void Hart::load_segments(const LoadableImage &image)
 {
