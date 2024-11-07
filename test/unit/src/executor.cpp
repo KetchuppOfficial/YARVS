@@ -154,6 +154,42 @@ TEST_F(ExecutorTest, Addi)
     EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
 }
 
+TEST_F(ExecutorTest, Andi)
+{
+    constexpr DoubleWord kMaxDoubleWord = 0xffffffffffffffff;
+    constexpr std::array<RawInstruction, 6> kInstructions = {
+        0b000000000000'00001'111'00010'0010011, // andi x2, x1, 0  [rd != rs1 && imm == 0]
+        0b000000010101'00001'111'00011'0010011, // andi x3, x1, 21 [rd != rs1 && imm > 0]
+        0b111111111111'00001'111'00100'0010011, // andi x4, x1, -1 [rd != rs1 && imm < 0]
+        0b000000000000'00101'111'00101'0010011, // andi x5, x5, 0  [rd == rs1 && imm == 0]
+        0b000000010101'00110'111'00110'0010011, // andi x6, x6, 21 [rd == rs1 && imm > 0]
+        0b111111111111'00111'111'00111'0010011  // andi x7, x7, -1 [rd == rs1 && imm < 0]
+    };
+
+    add_instructions(kInstructions);
+
+    hart.gprs().set_reg(1, kMaxDoubleWord);
+    hart.gprs().set_reg(5, kMaxDoubleWord);
+    hart.gprs().set_reg(6, kMaxDoubleWord);
+    hart.gprs().set_reg(7, kMaxDoubleWord);
+
+    hart.run();
+
+    EXPECT_EQ(hart.gprs().get_reg(0), 0);
+    EXPECT_EQ(hart.gprs().get_reg(1), kMaxDoubleWord);
+    EXPECT_EQ(hart.gprs().get_reg(2), 0);
+    EXPECT_EQ(hart.gprs().get_reg(3), 21);
+    EXPECT_EQ(hart.gprs().get_reg(4), kMaxDoubleWord);
+    EXPECT_EQ(hart.gprs().get_reg(5), 0);
+    EXPECT_EQ(hart.gprs().get_reg(6), 21);
+    EXPECT_EQ(hart.gprs().get_reg(7), kMaxDoubleWord);
+
+    for (auto i : std::views::iota(8uz, RegFile::kNRegs))
+        EXPECT_EQ(hart.gprs().get_reg(i), 0) << std::format("x{}", i);
+
+    EXPECT_EQ(hart.get_pc(), kEntry + kInstructions.size() * kInstrSize);
+}
+
 TEST_F(ExecutorTest, Load_Byte)
 {
     constexpr auto kAddr = kEntry + 0x1000;
