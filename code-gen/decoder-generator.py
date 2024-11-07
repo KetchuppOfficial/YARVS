@@ -98,11 +98,11 @@ def generate_one_instr(id : str, info : dict) -> str:
     if "rd" in vars:
         out += ",\n" + " " * 12 + ".rd = get_bits_r<11, 7, Byte>(raw_instr)"
 
-    if "imm12" in vars:
+    if any(imm_type in vars for imm_type in ["imm12", "shamtd", "shamtw"]):
         out += ",\n" + " " * 12 + ".imm = decode_i_imm(raw_instr)"
-    elif "imm12hi" in vars and "imm12lo" in vars:
+    elif all(imm_type in vars for imm_type in ["imm12hi", "imm12lo"]):
         out += ",\n" + " " * 12 + ".imm = decode_s_imm(raw_instr)"
-    elif "bimm12hi" in vars and "bimm12lo" in vars:
+    elif all(imm_type in vars for imm_type in ["bimm12hi", "bimm12lo"]):
         out += ",\n" + " " * 12 + ".imm = decode_b_imm(raw_instr)"
     elif "imm20" in vars:
         out += ",\n" + " " * 12 + ".imm = decode_u_imm(raw_instr)"
