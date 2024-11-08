@@ -340,19 +340,19 @@ void exec_sb(const Instruction &instr, Hart &h) noexcept { exec_store<Byte>(inst
 
 void exec_fence(const Instruction &instr, Hart &h)
 {
-    throw std::runtime_error{"not implemented"};
+    throw std::runtime_error{"FENCE is not implemented"};
 }
 
 // RVI environment call and breakpoints
 
 void exec_ecall(const Instruction &instr, Hart &h)
 {
-    throw std::runtime_error{"not implemented"};
+    throw std::runtime_error{"ECALL is not implemented"};
 }
 
 void exec_ebreak(const Instruction &instr, Hart &h)
 {
-    throw std::runtime_error{"not implemented"};
+    throw std::runtime_error{"EBREAK is not implemented"};
 }
 
 } // namespace yarvs
