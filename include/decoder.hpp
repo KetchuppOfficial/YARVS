@@ -1,11 +1,6 @@
 #ifndef INCLUDE_DECODER_HPP
 #define INCLUDE_DECODER_HPP
 
-#include <array>
-#include <stdexcept>
-#include <unordered_map>
-#include <format>
-
 #include "common.hpp"
 #include "instruction.hpp"
 #include "bits_manipulation.hpp"
@@ -23,21 +18,12 @@ public:
 
     explicit Decoder() = default;
 
-    static Instruction decode(RawInstruction raw_instr)
-    {
-        auto opcode = get_bits<6, 0>(raw_instr);
-        mask_type mask = masks_[opcode];
-        if (mask != 0) [[likely]]
-        {
-            auto it = match_map_.find(raw_instr & mask);
-            if (it != match_map_.end()) [[likely]]
-                return it->second(raw_instr);
-        }
-
-        throw std::invalid_argument{std::format("unknown instruction: {:#x}", raw_instr)};
-    }
+    static Instruction decode(RawInstruction raw_instr); // generated from risc-v opcodes
 
 private:
+
+    // generated from risc-v opcodes
+    static decoding_func_type get_decoder(match_type match) noexcept;
 
     static constexpr DoubleWord decode_i_imm(RawInstruction raw_instr) noexcept
     {
@@ -70,10 +56,6 @@ private:
                                   | (mask_bits<19, 12>(raw_instr))
                                   | (mask_bit<31>(raw_instr) >> 11));
     }
-
-    // both are generated from risc-v opcodes
-    static const std::array<mask_type, 1 << kOpcodeBitLen> masks_;
-    static const std::unordered_map<match_type, decoding_func_type> match_map_;
 };
 
 } // namespace yarvs
