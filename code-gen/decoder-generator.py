@@ -138,6 +138,8 @@ def generate_one_instr_case(id : str, info : dict) -> str:
         out += ",\n" + " " * 20 + ".imm = decode_u_imm(raw_instr)"
     elif "jimm20" in vars:
         out += ",\n" + " " * 20 + ".imm = decode_j_imm(raw_instr)"
+    elif all(field in vars for field in ["fm", "pred", "succ"]): # fence instruction
+        out += ",\n" + " " * 20 + ".imm = get_bits<31, 20>(raw_instr)"
 
     out += "\n" + " " * 16 + "};\n" + " " * 12 + "};"
 
