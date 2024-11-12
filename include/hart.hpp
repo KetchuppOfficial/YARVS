@@ -1,6 +1,9 @@
 #ifndef INCLUDE_HART_HPP
 #define INCLUDE_HART_HPP
 
+#include <array>
+#include <cstddef>
+
 #include "common.hpp"
 #include "reg_file.hpp"
 #include "decoder.hpp"
@@ -16,6 +19,7 @@ class Hart final
 {
 public:
 
+    static constexpr std::array<std::size_t, 6> kSyscallArgRegs = {10, 11, 12, 13, 14, 15};
     static constexpr std::size_t kSyscallNumReg = 17;
 
     explicit Hart(DoubleWord pc) : pc_{pc} {}
