@@ -4,8 +4,7 @@
 #include <array>
 #include <stdexcept>
 #include <unordered_map>
-
-#include <fmt/format.h>
+#include <format>
 
 #include "common.hpp"
 #include "instruction.hpp"
@@ -35,7 +34,7 @@ public:
                 return it->second(raw_instr);
         }
 
-        throw std::invalid_argument{fmt::format("unknown instruction: {:#x}", raw_instr)};
+        throw std::invalid_argument{std::format("unknown instruction: {:#x}", raw_instr)};
     }
 
 private:
