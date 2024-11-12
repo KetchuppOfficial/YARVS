@@ -2,8 +2,7 @@
 #include <stdexcept>
 #include <utility>
 #include <ranges>
-
-#include <fmt/format.h>
+#include <format>
 
 #include "common.hpp"
 #include "elf_loader.hpp"
@@ -15,10 +14,10 @@ LoadableImage::LoadableImage(const std::string &path_str)
 {
     ELFIO::elfio elf;
     if (!elf.load(path_str))
-        throw std::runtime_error{fmt::format("could not load ELF file \"{}\"", path_str)};
+        throw std::runtime_error{std::format("could not load ELF file \"{}\"", path_str)};
 
     if (auto error_msg = elf.validate(); !error_msg.empty())
-        throw std::invalid_argument{fmt::format("ELF file is invalid: {}", error_msg)};
+        throw std::invalid_argument{std::format("ELF file is invalid: {}", error_msg)};
 
     if (elf.get_class() != ELFIO::ELFCLASS64)
         throw std::invalid_argument{"only 64-bit ELF files are supported"};
@@ -48,7 +47,7 @@ LoadableImage::LoadableImage(const std::string &path_str)
             }
         }();
 
-        throw std::invalid_argument{fmt::format("ELF is of type \"{}\"; executable expected",
+        throw std::invalid_argument{std::format("ELF is of type \"{}\"; executable expected",
                                     type_str)};
     }
 

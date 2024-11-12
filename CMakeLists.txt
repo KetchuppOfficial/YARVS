@@ -45,7 +45,7 @@ target_include_directories(yarvs-lib
 )
 
 target_link_libraries(yarvs-lib
-    PUBLIC elfio::elfio fmt::fmt
+    PUBLIC elfio::elfio #fmt::fmt
 )
 
 # YARVS simulator
@@ -61,7 +61,7 @@ set_target_properties(yarvs PROPERTIES
 )
 
 target_link_libraries(yarvs
-    PRIVATE yarvs-lib CLI11::CLI11
+    PRIVATE yarvs-lib CLI11::CLI11 fmt::fmt
 )
 
 add_subdirectory(code-gen)
