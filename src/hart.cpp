@@ -22,14 +22,15 @@ void Hart::load_segments(const LoadableImage &image)
 
 void Hart::run()
 {
-    for (;;)
+    run_ = true;
+
+    do
     {
         auto raw_instr = mem_.load<RawInstruction>(pc_);
         Instruction instr = decoder_.decode(raw_instr);
-        if (instr.id == InstrID::kEBREAK) [[unlikely]]
-            break;
         executor_.execute(instr, *this);
     }
+    while (run_);
 }
 
 void Hart::clear()

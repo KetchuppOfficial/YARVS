@@ -16,11 +16,14 @@ class Hart final
 {
 public:
 
+    static constexpr std::size_t kSyscallNumReg = 17;
+
     explicit Hart(DoubleWord pc) : pc_{pc} {}
     explicit Hart(const LoadableImage &image);
 
     void load_segments(const LoadableImage &image);
     void run();
+    void stop() noexcept { run_ = false; };
     void clear();
 
     Word get_pc() const noexcept { return pc_; }
@@ -39,6 +42,7 @@ private:
     RegFile reg_file_;
     DoubleWord pc_;
     Memory mem_;
+    bool run_ = false;
     [[no_unique_address]] Decoder decoder_;
     [[no_unique_address]] Executor executor_;
 };

@@ -345,15 +345,20 @@ void exec_fence(const Instruction &instr, Hart &h)
 
 // RVI environment call and breakpoints
 
-void exec_ecall(const Instruction &instr, Hart &h)
+void exec_ecall([[maybe_unused]] const Instruction &instr, Hart &h)
 {
-    throw std::runtime_error{"ECALL is not implemented"};
+    switch (auto syscall_num = h.gprs().get_reg(Hart::kSyscallNumReg))
+    {
+        case 93: // exit
+            h.stop();
+            break;
+        default:
+            throw std::runtime_error{std::format("System call {:#x} is not implemented",
+                                                 syscall_num)};
+    }
 }
 
-void exec_ebreak(const Instruction &instr, Hart &h)
-{
-    throw std::runtime_error{"EBREAK is not implemented"};
-}
+void exec_ebreak([[maybe_unused]] const Instruction &instr, Hart &h) noexcept { h.stop(); }
 
 } // namespace yarvs
 
