@@ -27,10 +27,10 @@ public:
     {
         auto opcode = get_bits<6, 0>(raw_instr);
         mask_type mask = masks_[opcode];
-        if (mask != 0)
+        if (mask != 0) [[likely]]
         {
             auto it = match_map_.find(raw_instr & mask);
-            if (it != match_map_.end())
+            if (it != match_map_.end()) [[likely]]
                 return it->second(raw_instr);
         }
 

@@ -18,7 +18,7 @@ void Hart::run()
     {
         auto raw_instr = mem_.load<RawInstruction>(pc_);
         Instruction instr = decoder_.decode(raw_instr);
-        if (instr.id == InstrID::kEBREAK)
+        if (instr.id == InstrID::kEBREAK) [[unlikely]]
             break;
         executor_.execute(instr, *this);
     }
