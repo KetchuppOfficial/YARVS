@@ -22,7 +22,7 @@ int main(int argc, char **argv) try
     yarvs::Hart hart{segments};
     hart.run();
 
-    return 0;
+    return hart.get_status();
 }
 catch (const std::exception &e)
 {

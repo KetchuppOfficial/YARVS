@@ -19,6 +19,7 @@ class Hart final
 {
 public:
 
+    static constexpr std::size_t kSyscallRetReg = 10;
     static constexpr std::array<std::size_t, 6> kSyscallArgRegs = {10, 11, 12, 13, 14, 15};
     static constexpr std::size_t kSyscallNumReg = 17;
 
@@ -39,6 +40,9 @@ public:
     Memory &memory() noexcept { return mem_; }
     const Memory &memory() const noexcept { return mem_; }
 
+    int get_status() const noexcept { return status_; }
+    void set_status(int status) noexcept { status_ = status; }
+
 private:
 
     static constexpr DoubleWord kStackAddr = 0x7ffe49b14000;
@@ -46,6 +50,7 @@ private:
     RegFile reg_file_;
     DoubleWord pc_;
     Memory mem_;
+    int status_;
     bool run_ = false;
     [[no_unique_address]] Decoder decoder_;
     [[no_unique_address]] Executor executor_;

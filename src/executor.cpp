@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <type_traits>
 
+#include <unistd.h>
+
 #include "hart.hpp"
 #include "common.hpp"
 #include "executor.hpp"
@@ -338,7 +340,7 @@ void exec_sb(const Instruction &instr, Hart &h) noexcept { exec_store<Byte>(inst
 
 // RVI memory ordering instructions
 
-void exec_fence(const Instruction &instr, Hart &h)
+[[noreturn]] void exec_fence(const Instruction &instr, Hart &h)
 {
     throw std::runtime_error{"FENCE is not implemented"};
 }
@@ -356,18 +358,18 @@ void exec_ecall([[maybe_unused]] const Instruction &instr, Hart &h)
             auto *ptr = h.memory().ptr(gprs.get_reg(Hart::kSyscallArgRegs[1]));
             auto size = gprs.get_reg(Hart::kSyscallArgRegs[2]);
 
-            // ignore return value, because if there is a check for it, then it is performed in the
-            // guest architecture code
-            [[maybe_unused]] auto res = write(fd, reinterpret_cast<const char *>(ptr), size);
+            auto res = write(fd, reinterpret_cast<const char *>(ptr), size);
 
+            gprs.set_reg(Hart::kSyscallRetReg, res);
             h.set_pc(h.get_pc() + sizeof(RawInstruction));
             break;
         }
         case 93: // exit
             h.stop();
+            h.set_status(h.gprs().get_reg(Hart::kSyscallRetReg));
             break;
         default:
-            throw std::runtime_error{std::format("System call {:#x} is not implemented",
+            throw std::runtime_error{std::format("System call {:#x} is not supported",
                                                  syscall_num)};
     }
 }
