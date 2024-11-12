@@ -349,6 +349,20 @@ void exec_ecall([[maybe_unused]] const Instruction &instr, Hart &h)
 {
     switch (auto syscall_num = h.gprs().get_reg(Hart::kSyscallNumReg))
     {
+        case 64: // write
+        {
+            auto &gprs = h.gprs();
+            auto fd = gprs.get_reg(Hart::kSyscallArgRegs[0]);
+            auto *ptr = h.memory().ptr(gprs.get_reg(Hart::kSyscallArgRegs[1]));
+            auto size = gprs.get_reg(Hart::kSyscallArgRegs[2]);
+
+            // ignore return value, because if there is a check for it, then it is performed in the
+            // guest architecture code
+            [[maybe_unused]] auto res = write(fd, reinterpret_cast<const char *>(ptr), size);
+
+            h.set_pc(h.get_pc() + sizeof(RawInstruction));
+            break;
+        }
         case 93: // exit
             h.stop();
             break;
