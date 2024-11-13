@@ -13,6 +13,7 @@ class Hart;
 class Executor final
 {
 public:
+
     using callback_type = void(*)(const Instruction &, Hart &);
 
     explicit Executor() = default;
