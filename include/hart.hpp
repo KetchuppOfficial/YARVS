@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 #include "common.hpp"
 #include "reg_file.hpp"
@@ -27,7 +28,10 @@ public:
     explicit Hart(const LoadableImage &image);
 
     void load_segments(const LoadableImage &image);
-    void run();
+
+    // returns the number of executed instructions
+    std::uintmax_t run();
+
     void stop() noexcept { run_ = false; };
     void clear();
 

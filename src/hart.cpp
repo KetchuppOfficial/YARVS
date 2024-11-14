@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "hart.hpp"
 #include "elf_loader.hpp"
 
@@ -20,17 +22,21 @@ void Hart::load_segments(const LoadableImage &image)
         mem_.store(segment.get_virtual_addr(), segment.begin(), segment.end());
 }
 
-void Hart::run()
+std::uintmax_t Hart::run()
 {
     run_ = true;
 
+    std::uintmax_t instr_count = 0;
     do
     {
         auto raw_instr = mem_.load<RawInstruction>(pc_);
         Instruction instr = decoder_.decode(raw_instr);
         executor_.execute(*this, instr);
+        ++instr_count;
     }
     while (run_);
+
+    return instr_count;
 }
 
 void Hart::clear()

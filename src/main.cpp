@@ -1,5 +1,6 @@
 #include <exception>
 #include <filesystem>
+#include <chrono>
 
 #include <CLI/CLI.hpp>
 #include <fmt/base.h>
@@ -20,7 +21,16 @@ int main(int argc, char **argv) try
 
     yarvs::LoadableImage segments{elf_path};
     yarvs::Hart hart{segments};
-    hart.run();
+
+    auto start = std::chrono::high_resolution_clock::now();
+    auto instr_count = hart.run();
+    auto finish = std::chrono::high_resolution_clock::now();
+
+    using ms = std::chrono::microseconds;
+    auto time = std::chrono::duration_cast<ms>(finish - start).count();
+
+    fmt::println("\nExecuted {} instructions in {} mcs", instr_count, time);
+    fmt::println("Performance: {} MIPS", instr_count * 1e3 / time);
 
     return hart.get_status();
 }
