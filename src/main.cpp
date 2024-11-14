@@ -36,11 +36,11 @@ int main(int argc, char **argv) try
 }
 catch (const std::exception &e)
 {
-    fmt::println("Caught as instance of {}.\nwhat(): {}", typeid(e).name(), e.what());
+    fmt::println(stderr, "Caught as instance of {}.\nwhat(): {}", typeid(e).name(), e.what());
     return 1;
 }
 catch (...)
 {
-    fmt::println("Caught an unknown exception");
+    fmt::println(stderr, "Caught an unknown exception");
     return 1;
 }
