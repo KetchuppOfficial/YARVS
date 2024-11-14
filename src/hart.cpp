@@ -28,7 +28,7 @@ void Hart::run()
     {
         auto raw_instr = mem_.load<RawInstruction>(pc_);
         Instruction instr = decoder_.decode(raw_instr);
-        executor_.execute(instr, *this);
+        executor_.execute(*this, instr);
     }
     while (run_);
 }

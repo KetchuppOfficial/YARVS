@@ -14,11 +14,11 @@ class Executor final
 {
 public:
 
-    using callback_type = void(*)(const Instruction &, Hart &);
+    using callback_type = void(*)(Hart &, const Instruction &);
 
     explicit Executor() = default;
 
-    static void execute(const Instruction &instr, Hart &h) { callbacks_[instr.id](instr, h); }
+    static void execute(Hart &h, const Instruction &instr) { callbacks_[instr.id](h, instr); }
 
 private:
 
