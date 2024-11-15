@@ -12,7 +12,7 @@ int main(int argc, char **argv) try
     CLI::App app{"YARVS: Yet Another RISC-V Simulator"};
 
     std::filesystem::path elf_path;
-    app.add_option("--elf", elf_path, "Path to RISC-V executable")
+    app.add_option("elf", elf_path, "Path to RISC-V executable")
         ->required()
         ->check(CLI::ExistingFile);
 
