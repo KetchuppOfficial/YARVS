@@ -34,6 +34,7 @@ add_library(yarvs-lib STATIC
 add_dependencies(yarvs-lib code_generator)
 
 set_target_properties(yarvs-lib PROPERTIES
+    OUTPUT_NAME yarvs
     CXX_STANDARD 23
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
@@ -49,17 +50,18 @@ target_link_libraries(yarvs-lib
 
 # YARVS simulator
 
-add_executable(yarvs
+add_executable(yarvs-exe
     ${SOURCE_DIR}/main.cpp
 )
 
-set_target_properties(yarvs PROPERTIES
+set_target_properties(yarvs-exe PROPERTIES
+    OUTPUT_NAME yarvs
     CXX_STANDARD 23
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
 
-target_link_libraries(yarvs
+target_link_libraries(yarvs-exe
     PRIVATE yarvs-lib CLI11::CLI11 fmt::fmt
 )
 
