@@ -27,7 +27,6 @@ set(BUILD_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
 
 add_library(yarvs-lib STATIC
     ${SOURCE_DIR}/hart.cpp
-    ${SOURCE_DIR}/elf_loader.cpp
     ${SOURCE_DIR}/executor.cpp
     ${BUILD_SOURCE_DIR}/decoder.cpp
 )
@@ -45,7 +44,7 @@ target_include_directories(yarvs-lib
 )
 
 target_link_libraries(yarvs-lib
-    PUBLIC elfio::elfio #fmt::fmt
+    PRIVATE elfio::elfio
 )
 
 # YARVS simulator

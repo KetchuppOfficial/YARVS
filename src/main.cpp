@@ -5,7 +5,6 @@
 #include <CLI/CLI.hpp>
 #include <fmt/base.h>
 
-#include "elf_loader.hpp"
 #include "hart.hpp"
 
 int main(int argc, char **argv) try
@@ -19,8 +18,7 @@ int main(int argc, char **argv) try
 
     CLI11_PARSE(app, argc, argv);
 
-    yarvs::LoadableImage segments{elf_path};
-    yarvs::Hart hart{segments};
+    yarvs::Hart hart{elf_path};
 
     auto start = std::chrono::high_resolution_clock::now();
     auto instr_count = hart.run();

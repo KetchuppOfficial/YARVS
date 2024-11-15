@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 
 #include "common.hpp"
 #include "reg_file.hpp"
@@ -24,10 +25,10 @@ public:
     static constexpr std::array<std::size_t, 6> kSyscallArgRegs = {10, 11, 12, 13, 14, 15};
     static constexpr std::size_t kSyscallNumReg = 17;
 
-    explicit Hart(DoubleWord pc) : pc_{pc} {}
-    explicit Hart(const LoadableImage &image);
+    explicit Hart() = default;
+    explicit Hart(const std::filesystem::path &path);
 
-    void load_segments(const LoadableImage &image);
+    void load_elf(const std::filesystem::path &path);
 
     // returns the number of executed instructions
     std::uintmax_t run();
@@ -54,7 +55,7 @@ private:
     RegFile reg_file_;
     DoubleWord pc_;
     Memory mem_;
-    int status_;
+    int status_ = 0;
     bool run_ = false;
     [[no_unique_address]] Decoder decoder_;
     [[no_unique_address]] Executor executor_;
