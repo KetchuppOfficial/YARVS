@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <iterator>
 #include <algorithm>
+#include <cstdint>
 
 #include "common.hpp"
 #include "memory/mmap_wrapper.hpp"
@@ -17,7 +18,7 @@ public:
 
     static constexpr std::size_t kPhysMemAmount = 4 * (std::size_t{1} << 30); // 4GB
 
-    Memory() : physical_mem_{kPhysMemAmount, MMapWrapper::kRead | MMapWrapper::kWrite} {}
+    explicit Memory() : physical_mem_{kPhysMemAmount, MMapWrapper::kRead | MMapWrapper::kWrite} {}
 
     template<riscv_type T>
     T load(DoubleWord addr) const
@@ -33,15 +34,15 @@ public:
         *reinterpret_cast<T*>(ptr(addr)) = value;
     }
 
-    template<std::forward_iterator It>
+    template<std::input_iterator It>
     void store(DoubleWord addr, It first, It last)
     {
-        using value_type = typename std::iterator_traits<It>::value_type;
+        using value_type = std::remove_const_t<typename std::iterator_traits<It>::value_type>;
         std::copy(first, last, reinterpret_cast<value_type *>(ptr(addr)));
     }
 
-    const uint8_t *ptr(DoubleWord addr) const { return &physical_mem_[addr]; }
-    uint8_t *ptr(DoubleWord addr) { return &physical_mem_[addr]; }
+    const std::uint8_t *ptr(DoubleWord addr) const { return &physical_mem_[addr]; }
+    std::uint8_t *ptr(DoubleWord addr) { return &physical_mem_[addr]; }
 
 private:
 
