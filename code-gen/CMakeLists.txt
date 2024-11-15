@@ -1,7 +1,7 @@
 set(BUILD_CODEGEN_DIR ${PROJECT_BINARY_DIR}/code-gen)
 
-file(COPY ${CODEGEN_DIR}/decoder-generator.py DESTINATION ${BUILD_CODEGEN_DIR})
-file(COPY ${CODEGEN_DIR}/requirements.txt DESTINATION ${BUILD_CODEGEN_DIR})
+configure_file(${CODEGEN_DIR}/decoder-generator.py ${BUILD_CODEGEN_DIR} COPYONLY)
+configure_file(${CODEGEN_DIR}/requirements.txt ${BUILD_CODEGEN_DIR} COPYONLY)
 
 file(MAKE_DIRECTORY ${BUILD_INCLUDE_DIR})
 file(MAKE_DIRECTORY ${BUILD_SOURCE_DIR})
@@ -13,7 +13,6 @@ add_custom_command(
     OUTPUT ${RISCV_YAML}
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/riscv-opcodes
     COMMAND ${Python_EXECUTABLE} parse.py rv_i rv64_i
-    DEPENDS ${PROJECT_SOURCE_DIR}/riscv-opcodes/parse.py
 )
 
 add_custom_command(
@@ -23,6 +22,7 @@ add_custom_command(
     COMMAND ${Python_EXECUTABLE} -m venv .venv
     COMMAND . .venv/bin/activate &&
             pip3 install -r requirements.txt --require-virtualenv
+    DEPENDS ${CODEGEN_DIR}/requirements.txt
 )
 
 set(INSTRUCTION_IDS ${BUILD_INCLUDE_DIR}/identifiers.hpp)
@@ -46,7 +46,7 @@ add_custom_command(
     COMMAND . .venv/bin/activate &&
             ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML}
                 --exec ${EXECUTOR_TABLE_HEADER}
-    DEPENDS ${CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML} ${BUILD_CODEGEN_DIR}/.venv
+    DEPENDS ${INSTRUCTION_IDS}
 )
 
 set(DECODER ${BUILD_SOURCE_DIR}/decoder.cpp)
@@ -58,9 +58,9 @@ add_custom_command(
     COMMAND . .venv/bin/activate &&
             ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML}
                 --decoder ${DECODER}
-    DEPENDS ${INSTRUCTION_IDS} ${EXECUTOR_TABLE_HEADER}
+    DEPENDS ${INSTRUCTION_IDS}
 )
 
 add_custom_target(code_generator
-    DEPENDS ${INSTRUCTION_IDS} ${DECODER}
+    DEPENDS ${INSTRUCTION_IDS} ${EXECUTOR_TABLE_HEADER} ${DECODER}
 )
