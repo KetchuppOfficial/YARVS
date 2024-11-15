@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <concepts>
 #include <climits>
+#include <cstddef>
 
 namespace yarvs
 {
