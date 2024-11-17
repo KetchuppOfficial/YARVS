@@ -16,19 +16,28 @@ int main(int argc, char **argv) try
         ->required()
         ->check(CLI::ExistingFile);
 
+    bool perf = false;
+    app.add_flag("--perf", perf, "Measure performance: execution time, "
+                                 "the number of executed instructions and MIPS");
+
     CLI11_PARSE(app, argc, argv);
 
     yarvs::Hart hart{elf_path};
 
-    auto start = std::chrono::high_resolution_clock::now();
-    auto instr_count = hart.run();
-    auto finish = std::chrono::high_resolution_clock::now();
+    if (perf)
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+        auto instr_count = hart.run();
+        auto finish = std::chrono::high_resolution_clock::now();
 
-    using ms = std::chrono::microseconds;
-    auto time = std::chrono::duration_cast<ms>(finish - start).count();
+        using ms = std::chrono::microseconds;
+        auto time = std::chrono::duration_cast<ms>(finish - start).count();
 
-    fmt::println("\nExecuted {} instructions in {} mcs", instr_count, time);
-    fmt::println("Performance: {} MIPS", instr_count * 1e3 / time);
+        fmt::println("\nExecuted {} instructions in {} mcs", instr_count, time);
+        fmt::println("Performance: {} MIPS", instr_count * 1e3 / time);
+    }
+    else
+        hart.run();
 
     return hart.get_status();
 }
