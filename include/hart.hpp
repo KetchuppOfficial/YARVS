@@ -7,10 +7,13 @@
 #include <filesystem>
 
 #include "common.hpp"
+#include "instruction.hpp"
 #include "reg_file.hpp"
 #include "decoder.hpp"
 #include "executor.hpp"
+
 #include "memory/memory.hpp"
+#include "cache/lru.hpp"
 
 namespace yarvs
 {
@@ -25,7 +28,7 @@ public:
     static constexpr std::array<std::size_t, 6> kSyscallArgRegs = {10, 11, 12, 13, 14, 15};
     static constexpr std::size_t kSyscallNumReg = 17;
 
-    explicit Hart() = default;
+    explicit Hart();
     explicit Hart(const std::filesystem::path &path);
 
     void load_elf(const std::filesystem::path &path);
@@ -51,12 +54,22 @@ public:
 private:
 
     static constexpr DoubleWord kStackAddr = 0x7ffe49b14000;
+    static constexpr std::size_t kDefaultCacheCapacity = 100;
 
     RegFile reg_file_;
     DoubleWord pc_;
     Memory mem_;
+
+    // wrap decoder in lambda for it not to occupy any space in LRU layout
+    using decoder_closure = decltype([](RawInstruction raw_instr){
+        return Decoder::decode(raw_instr);
+    });
+
+    LRU<RawInstruction, Instruction, decoder_closure> instr_cache_;
+
     int status_ = 0;
     bool run_ = false;
+
     [[no_unique_address]] Decoder decoder_;
     [[no_unique_address]] Executor executor_;
 };

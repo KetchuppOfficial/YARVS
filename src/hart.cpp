@@ -11,7 +11,9 @@
 namespace yarvs
 {
 
-Hart::Hart(const std::filesystem::path &path)
+Hart::Hart() : instr_cache_(kDefaultCacheCapacity, decoder_closure{}) {}
+
+Hart::Hart(const std::filesystem::path &path) : Hart{}
 {
     load_elf(path);
 
@@ -84,14 +86,12 @@ std::uintmax_t Hart::run()
     run_ = true;
 
     std::uintmax_t instr_count = 0;
-    do
+    for (; run_; ++instr_count)
     {
         auto raw_instr = mem_.load<RawInstruction>(pc_);
-        Instruction instr = decoder_.decode(raw_instr);
+        auto &instr = instr_cache_.lookup_update(raw_instr);
         executor_.execute(*this, instr);
-        ++instr_count;
     }
-    while (run_);
 
     return instr_count;
 }
@@ -101,6 +101,11 @@ void Hart::clear()
     reg_file_.clear();
     pc_ = 0;
     mem_ = Memory{};
+
+    instr_cache_.clear();
+
+    run_ = false;
+    status_ = 0;
 }
 
 } // namespace yarvs
