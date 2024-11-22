@@ -26,7 +26,7 @@ constexpr std::size_t kNBits = sizeof(T) * CHAR_BIT;
 template<std::size_t to, std::size_t from, std::unsigned_integral T>
 constexpr T mask_bits(T num) noexcept
 {
-    static_assert(from <= to);
+    static_assert(from < to);
     static_assert(to < kNBits<T>);
 
     auto mask = []
@@ -51,7 +51,7 @@ constexpr T mask_bits(T num) noexcept
 template<std::size_t to, std::size_t from, std::unsigned_integral T>
 constexpr T get_bits(T num) noexcept
 {
-    static_assert(from <= to);
+    static_assert(from < to);
     static_assert(to < kNBits<T>);
 
     return mask_bits<to, from>(num) >> from;
@@ -64,9 +64,9 @@ constexpr T get_bits(T num) noexcept
 template<std::size_t to, std::size_t from, std::unsigned_integral R, std::unsigned_integral T>
 constexpr R get_bits_r(T num) noexcept
 {
-    static_assert(from <= to);
+    static_assert(from < to);
     static_assert(to < kNBits<T>);
-    static_assert(to - from <= kNBits<R>);
+    static_assert(to - from < kNBits<R>);
 
     return static_cast<R>(get_bits<to, from>(num));
 }
