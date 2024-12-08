@@ -18,8 +18,6 @@
 namespace yarvs
 {
 
-class LoadableImage;
-
 class Hart final
 {
 public:
