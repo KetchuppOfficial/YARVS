@@ -246,7 +246,8 @@ def main() -> None:
         raise Exception(f"\"{args.path}\" does not exist")
     if not Path.is_file(Path(args.path)):
         raise Exception(f"\"{args.path}\" is not a file")
-    if args.enum == None and args.decoder == None and args.exec == None:
+
+    if all(arg == None for arg in [args.enum, args.decoder, args.exec]):
         raise Exception(f"At least one option --enum, --decoder or --exec shall be specified")
 
     with open(args.path, "r") as yaml_file:

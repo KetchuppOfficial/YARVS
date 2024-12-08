@@ -1,6 +1,6 @@
 set(BUILD_CODEGEN_DIR ${PROJECT_BINARY_DIR}/code-gen)
 
-configure_file(${CODEGEN_DIR}/decoder-generator.py ${BUILD_CODEGEN_DIR} COPYONLY)
+configure_file(${CODEGEN_DIR}/generator.py ${BUILD_CODEGEN_DIR} COPYONLY)
 configure_file(${CODEGEN_DIR}/requirements.txt ${BUILD_CODEGEN_DIR} COPYONLY)
 
 file(MAKE_DIRECTORY ${BUILD_INCLUDE_DIR})
@@ -26,41 +26,21 @@ add_custom_command(
 )
 
 set(INSTRUCTION_IDS ${BUILD_INCLUDE_DIR}/identifiers.hpp)
-
-add_custom_command(
-    COMMENT "Generating instruction identifiers"
-    OUTPUT ${INSTRUCTION_IDS}
-    WORKING_DIRECTORY ${BUILD_CODEGEN_DIR}
-    COMMAND . .venv/bin/activate &&
-            ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML}
-                --enum ${INSTRUCTION_IDS}
-    DEPENDS ${CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML} ${BUILD_CODEGEN_DIR}/.venv
-)
-
+set(DECODER ${BUILD_SOURCE_DIR}/decoder.cpp)
 set(EXECUTOR_TABLE_HEADER ${BUILD_INCLUDE_DIR}/executor_table.hpp)
 
 add_custom_command(
-    COMMENT "Generating lookup table for executor"
-    OUTPUT ${EXECUTOR_TABLE_HEADER}
+    COMMENT "Generating code for decoder and executor"
+    OUTPUT ${INSTRUCTION_IDS} ${DECODER} ${EXECUTOR_TABLE_HEADER}
     WORKING_DIRECTORY ${BUILD_CODEGEN_DIR}
     COMMAND . .venv/bin/activate &&
-            ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML}
-                --exec ${EXECUTOR_TABLE_HEADER}
-    DEPENDS ${INSTRUCTION_IDS}
-)
-
-set(DECODER ${BUILD_SOURCE_DIR}/decoder.cpp)
-
-add_custom_command(
-    COMMENT "Generating decoder"
-    OUTPUT ${DECODER}
-    WORKING_DIRECTORY ${BUILD_CODEGEN_DIR}
-    COMMAND . .venv/bin/activate &&
-            ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/decoder-generator.py ${RISCV_YAML}
+            ${Python_EXECUTABLE} ${BUILD_CODEGEN_DIR}/generator.py ${RISCV_YAML}
+                --enum ${INSTRUCTION_IDS}
                 --decoder ${DECODER}
-    DEPENDS ${INSTRUCTION_IDS}
+                --exec ${EXECUTOR_TABLE_HEADER}
+    DEPENDS ${CODEGEN_DIR}/generator.py ${RISCV_YAML} ${BUILD_CODEGEN_DIR}/.venv
 )
 
 add_custom_target(code_generator
-    DEPENDS ${INSTRUCTION_IDS} ${EXECUTOR_TABLE_HEADER} ${DECODER}
+    DEPENDS ${INSTRUCTION_IDS} ${DECODER} ${EXECUTOR_TABLE_HEADER}
 )
