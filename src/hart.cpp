@@ -90,7 +90,7 @@ std::uintmax_t Hart::run()
     {
         auto raw_instr = mem_.load<RawInstruction>(pc_);
         auto &instr = instr_cache_.lookup_update(raw_instr);
-        executor_.execute(*this, instr);
+        Executor::execute(*this, instr);
     }
 
     return instr_count;

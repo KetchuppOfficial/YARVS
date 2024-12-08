@@ -69,9 +69,6 @@ private:
 
     int status_ = 0;
     bool run_ = false;
-
-    [[no_unique_address]] Decoder decoder_;
-    [[no_unique_address]] Executor executor_;
 };
 
 } // namespace yarvs
