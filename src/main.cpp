@@ -24,20 +24,16 @@ int main(int argc, char **argv) try
 
     yarvs::Hart hart{elf_path};
 
+    auto start = std::chrono::high_resolution_clock::now();
+    auto instr_count = hart.run();
+    auto finish = std::chrono::high_resolution_clock::now();
+
+    using mcs = std::chrono::microseconds;
+    auto time = std::chrono::duration_cast<mcs>(finish - start).count();
+
     if (perf)
-    {
-        auto start = std::chrono::high_resolution_clock::now();
-        auto instr_count = hart.run();
-        auto finish = std::chrono::high_resolution_clock::now();
-
-        using ms = std::chrono::microseconds;
-        auto time = std::chrono::duration_cast<ms>(finish - start).count();
-
-        fmt::println("\nExecuted {} instructions in {} mcs", instr_count, time);
-        fmt::println("Performance: {} MIPS", instr_count * 1e3 / time);
-    }
-    else
-        hart.run();
+        fmt::println("Executed {} instructions in {} mcs.\nPerformance: {:.2f} MIPS",
+                     instr_count, time, static_cast<double>(instr_count) / time);
 
     return hart.get_status();
 }
