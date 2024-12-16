@@ -6,11 +6,11 @@
 #include <cstdint>
 #include <filesystem>
 #include <expected>
+#include <vector>
 
 #include "common.hpp"
 #include "instruction.hpp"
 #include "reg_file.hpp"
-#include "decoder.hpp"
 #include "executor.hpp"
 #include "csr.hpp"
 
@@ -52,21 +52,17 @@ public:
 
 private:
 
-    static constexpr DoubleWord kStackAddr = 0x7ffe49b14000;
-    static constexpr std::size_t kDefaultCacheCapacity = 100;
-
     RegFile reg_file_;
     DoubleWord pc_;
     CSRegfile csrs_;
 
+    static constexpr DoubleWord kStackAddr = 0x7ffe49b14000;
     Memory mem_;
 
-    // wrap decoder in lambda for it not to occupy any space in LRU layout
-    using decoder_closure = decltype([](RawInstruction raw_instr){
-        return Decoder::decode(raw_instr);
-    });
-
-    LRU<RawInstruction, Instruction, decoder_closure> instr_cache_;
+    static constexpr std::size_t kDefaultCacheCapacity = 64;
+    static constexpr std::size_t kDefaultBBLength = 24;
+    using BasicBlock = std::vector<Instruction>;
+    LRU<DoubleWord, BasicBlock> bb_cache_;
 
     int status_ = 0;
     bool run_ = false;

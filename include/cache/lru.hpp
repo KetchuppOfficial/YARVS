@@ -4,12 +4,13 @@
 #include <cstddef>
 #include <list>
 #include <unordered_map>
-#include <tuple>
+#include <cassert>
+#include <utility>
 
 namespace yarvs
 {
 
-template<typename KeyT, typename PageT, typename PageGetter>
+template<typename KeyT, typename PageT>
 class LRU final
 {
 public:
@@ -17,44 +18,34 @@ public:
     using key_type = KeyT;
     using page_type = PageT;
     using size_type = std::size_t;
-    using page_getter_type = PageGetter;
+    using page_iterator = typename std::list<std::pair<key_type, page_type>>::const_iterator;
 
-    LRU(size_type capacity, page_getter_type slow_get_page)
-        : hash_table_(capacity), capacity_and_page_getter_{capacity, slow_get_page} {}
+    explicit LRU(size_type capacity) : hash_table_(capacity), capacity_{capacity} {}
 
-    size_type capacity() const noexcept { return std::get<0>(capacity_and_page_getter_); }
-    page_getter_type page_getter() const noexcept { return std::get<1>(capacity_and_page_getter_); }
-
+    size_type capacity() const noexcept { return capacity_; }
     size_type size() const noexcept { return hash_table_.size(); }
     bool is_full() const noexcept { return size() == capacity(); }
 
-    const page_type &lookup_update(const key_type &key)
+    page_iterator begin() const noexcept { return pages_.begin(); }
+    page_iterator end() const noexcept { return pages_.end(); }
+
+    page_iterator lookup(const key_type &key)
     {
-        if (auto hit = hash_table_.find(key); hit == hash_table_.end())
-        {
-            if (is_full())
-            {
-                hash_table_.erase(pages_.back().first);
-                pages_.pop_back();
-            }
+        auto hit = hash_table_.find(key);
+        if (hit == hash_table_.end())
+            return end();
 
-            pages_.emplace_front(key, page_getter()(key));
-            auto page_it = pages_.begin();
-            hash_table_.emplace(key, page_it);
+        auto page_it = hit->second;
 
-            return page_it->second;
-        }
-        else
-        {
-            auto page_it = hit->second;
+        // [list.ops]: The result is unchanged if position == i
+        // That's why we do not need to check that page_it != pages_.begin()
+        pages_.splice(pages_.begin(), pages_, page_it);
 
-            // [list.ops]: The result is unchanged if position == i
-            // That's why we do not need to check that page_it != pages_.begin()
-            pages_.splice(pages_.begin(), pages_, page_it);
-
-            return page_it->second;
-        }
+        return page_it;
     }
+
+    void update(const key_type &key, const page_type &page) { update_impl(key, page); }
+    void update(const key_type &key, page_type &&page) { update_impl(key, std::move(page)); }
 
     void clear()
     {
@@ -65,12 +56,24 @@ public:
 
 private:
 
+    template<typename P>
+    void update_impl(const key_type &key, P &&page)
+    {
+        assert(!hash_table_.contains(key));
+
+        if (is_full())
+        {
+            hash_table_.erase(pages_.back().first);
+            pages_.pop_back();
+        }
+
+        pages_.emplace_front(key, std::forward<P>(page));
+        hash_table_.emplace(key, pages_.begin());
+    }
+
     std::list<std::pair<key_type, page_type>> pages_;
-
-    using page_iterator = decltype(pages_)::iterator;
-
     std::unordered_map<key_type, page_iterator> hash_table_;
-    std::tuple<size_type, page_getter_type> capacity_and_page_getter_; // for EBO purposes
+    size_type capacity_;
 };
 
 } // namespace yarvs

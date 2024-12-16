@@ -14,11 +14,15 @@ class Executor final
 {
 public:
 
-    using callback_type = void(*)(Hart &, const Instruction &);
+    // return value indicates whether instruction is a basic block terminator
+    using callback_type = bool(*)(Hart &, const Instruction &);
 
     explicit Executor() = default;
 
-    static void execute(Hart &h, const Instruction &instr) { callbacks_[instr.id](h, instr); }
+    static bool execute(Hart &h, const Instruction &instr)
+    {
+        return callbacks_[instr.id](h, instr);
+    }
 
 private:
 

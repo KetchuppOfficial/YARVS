@@ -8,15 +8,13 @@
 
 #include "hart.hpp"
 #include "common.hpp"
-#include "csr.hpp"
-
-#include "memory/mmap_wrapper.hpp"
+#include "decoder.hpp"
+#include "executor.hpp"
 
 namespace yarvs
 {
 
-Hart::Hart()
-    : mem_{csrs_}, instr_cache_(kDefaultCacheCapacity, decoder_closure{}) {}
+Hart::Hart() : mem_{csrs_}, bb_cache_{kDefaultCacheCapacity} {}
 
 Hart::Hart(const std::filesystem::path &path) : Hart{}
 {
@@ -90,12 +88,34 @@ std::uintmax_t Hart::run()
 {
     run_ = true;
 
+    BasicBlock bb;
     std::uintmax_t instr_count = 0;
-    for (; run_; ++instr_count)
+    while (run_)
     {
-        auto raw_instr = mem_.fetch(pc_);
-        auto &instr = instr_cache_.lookup_update(raw_instr);
-        Executor::execute(*this, instr);
+        if (auto bb_it = bb_cache_.lookup(pc_); bb_it != bb_cache_.end())
+        {
+            for (const auto &instr : bb_it->second)
+            {
+                Executor::execute(*this, instr);
+                ++instr_count;
+            }
+        }
+        else
+        {
+            bb.reserve(kDefaultBBLength);
+
+            const auto bb_pc = pc_;
+
+            for (bool is_terminator = false; !is_terminator; ++instr_count)
+            {
+                auto raw_instr = mem_.fetch(pc_);
+                const auto &instr = bb.emplace_back(Decoder::decode(raw_instr));
+                is_terminator = Executor::execute(*this, instr);
+            }
+
+            bb_cache_.update(bb_pc, std::move(bb));
+            bb.clear(); // just in case: moved-from object is in valid but unspecified state
+        }
     }
 
     return instr_count;
