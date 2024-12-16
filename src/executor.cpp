@@ -355,7 +355,7 @@ void exec_ecall(Hart &h, [[maybe_unused]] const Instruction &instr)
         {
             auto &gprs = h.gprs();
             auto fd = gprs.get_reg(Hart::kSyscallArgRegs[0]);
-            auto *ptr = h.memory().ptr(gprs.get_reg(Hart::kSyscallArgRegs[1]));
+            auto *ptr = h.memory().host_ptr(gprs.get_reg(Hart::kSyscallArgRegs[1]));
             auto size = gprs.get_reg(Hart::kSyscallArgRegs[2]);
 
             auto res = write(fd, reinterpret_cast<const char *>(ptr), size);

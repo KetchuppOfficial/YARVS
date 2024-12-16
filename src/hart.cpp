@@ -7,11 +7,16 @@
 #include <elfio/elfio.hpp>
 
 #include "hart.hpp"
+#include "common.hpp"
+#include "csr.hpp"
+
+#include "memory/mmap_wrapper.hpp"
 
 namespace yarvs
 {
 
-Hart::Hart() : instr_cache_(kDefaultCacheCapacity, decoder_closure{}) {}
+Hart::Hart()
+    : mem_{csrs_}, instr_cache_(kDefaultCacheCapacity, decoder_closure{}) {}
 
 Hart::Hart(const std::filesystem::path &path) : Hart{}
 {
@@ -20,7 +25,7 @@ Hart::Hart(const std::filesystem::path &path) : Hart{}
     #if 0 // temporary workaround caused by absence of address translation
     reg_file_.set_reg(2, kStackAddr); // stack pointer
     #else
-    reg_file_.set_reg(2, 0x1000); // stack pointer
+    reg_file_.set_reg(2, 0x4000); // stack pointer
     #endif
 }
 
@@ -88,24 +93,12 @@ std::uintmax_t Hart::run()
     std::uintmax_t instr_count = 0;
     for (; run_; ++instr_count)
     {
-        auto raw_instr = mem_.load<RawInstruction>(pc_);
+        auto raw_instr = mem_.fetch(pc_);
         auto &instr = instr_cache_.lookup_update(raw_instr);
         Executor::execute(*this, instr);
     }
 
     return instr_count;
-}
-
-void Hart::clear()
-{
-    reg_file_.clear();
-    pc_ = 0;
-    mem_ = Memory{};
-
-    instr_cache_.clear();
-
-    run_ = false;
-    status_ = 0;
 }
 
 } // namespace yarvs

@@ -5,15 +5,17 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <expected>
 
 #include "common.hpp"
 #include "instruction.hpp"
 #include "reg_file.hpp"
 #include "decoder.hpp"
 #include "executor.hpp"
+#include "csr.hpp"
 
-#include "memory/memory.hpp"
 #include "cache/lru.hpp"
+#include "memory/memory.hpp"
 
 namespace yarvs
 {
@@ -35,7 +37,6 @@ public:
     std::uintmax_t run();
 
     void stop() noexcept { run_ = false; };
-    void clear();
 
     Word get_pc() const noexcept { return pc_; }
     void set_pc(DoubleWord pc) noexcept { pc_ = pc; }
@@ -56,6 +57,8 @@ private:
 
     RegFile reg_file_;
     DoubleWord pc_;
+    CSRegfile csrs_;
+
     Memory mem_;
 
     // wrap decoder in lambda for it not to occupy any space in LRU layout
