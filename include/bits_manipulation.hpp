@@ -15,6 +15,18 @@ static_assert(std::endian::native == std::endian::little);
 template<std::integral T>
 constexpr std::size_t kNBits = sizeof(T) * CHAR_BIT;
 
+template<std::size_t to, std::size_t from, std::unsigned_integral T>
+constexpr T get_mask() noexcept
+{
+    static_assert(from < to);
+    static_assert(to < kNBits<T>);
+
+    if constexpr (to == kNBits<T> - 1)
+        return ~T{0} - ((T{1} << from) - 1);
+    else
+        return (T{1} << (to + 1)) - (T{1} << from);
+}
+
 /*
  * Masks bits [to; from] (from <= to) of the input
  *
@@ -29,15 +41,7 @@ constexpr T mask_bits(T num) noexcept
     static_assert(from < to);
     static_assert(to < kNBits<T>);
 
-    auto mask = []
-    {
-        if constexpr (to == kNBits<T> - 1)
-            return ~T{0} - ((T{1} << from) - 1);
-        else
-            return (T{1} << (to + 1)) - (T{1} << from);
-    }();
-
-    return num & mask;
+    return num & get_mask<to, from, T>();
 }
 
 /*
@@ -55,6 +59,16 @@ constexpr T get_bits(T num) noexcept
     static_assert(to < kNBits<T>);
 
     return mask_bits<to, from>(num) >> from;
+}
+
+template<std::size_t to, std::size_t from, std::unsigned_integral T, std::unsigned_integral U>
+constexpr T set_bits(T num, U value) noexcept
+{
+    static_assert(from < to);
+    static_assert(to < kNBits<T>);
+
+    auto mask = get_mask<to, from, T>();
+    return (num & ~mask) | ((static_cast<T>(value) << from) & mask);
 }
 
 /*
