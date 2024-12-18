@@ -13,9 +13,9 @@ class ExecutorTest : public testing::Test
 {
 protected:
 
-    static constexpr RawInstruction kEbreak = 0b00000000000100000000000001110011;
+    static constexpr RawInstruction kEbreak = 0x00100073;
     static constexpr DoubleWord kEntry = 0x42000;
-    static constexpr DoubleWord kPageSize = 0x1000;
+    static constexpr DoubleWord kPageSize = Memory::kPageSize;
     static constexpr auto kInstrSize = sizeof(RawInstruction);
 
     ExecutorTest() { hart.set_pc(kEntry); }

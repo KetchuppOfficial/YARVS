@@ -16,7 +16,30 @@ struct Instruction final
     reg_index_type rs1;
     reg_index_type rs2;
     reg_index_type rd;
+    HalfWord csr;
     immediate_type imm; // sign-extended on decoding
+
+    bool is_terminator() const noexcept
+    {
+        switch (id)
+        {
+            case InstrID::kBEQ:
+            case InstrID::kBGE:
+            case InstrID::kBGEU:
+            case InstrID::kBLT:
+            case InstrID::kBLTU:
+            case InstrID::kBNE:
+            case InstrID::kEBREAK:
+            case InstrID::kECALL:
+            case InstrID::kJAL:
+            case InstrID::kJALR:
+            case InstrID::kMRET:
+            case InstrID::kSRET:
+                return true;
+            default:
+                return false;
+        }
+    }
 };
 
 } // namespace yarvs

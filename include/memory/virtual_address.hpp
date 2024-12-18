@@ -13,13 +13,13 @@ class VirtualAddress final
 {
 public:
 
-    VirtualAddress(DoubleWord va) noexcept : addr_{va} {}
+    constexpr VirtualAddress(DoubleWord va) noexcept : addr_{va} {}
 
-    operator DoubleWord() { return addr_; }
+    constexpr operator DoubleWord() noexcept { return addr_; }
 
-    DoubleWord get_page_offset() const noexcept { return mask_bits<11, 0>(addr_); }
+    constexpr DoubleWord get_page_offset() const noexcept { return mask_bits<11, 0>(addr_); }
 
-    DoubleWord get_vpn(Byte i) const noexcept
+    constexpr DoubleWord get_vpn(Byte i) const noexcept
     {
         switch (i)
         {

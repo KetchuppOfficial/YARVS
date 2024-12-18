@@ -24,6 +24,14 @@ using RawInstruction = std::uint32_t;
 constexpr auto kXLen = sizeof(DoubleWord) * CHAR_BIT;
 constexpr std::size_t kOpcodeBitLen = 7;
 
+enum PrivilegeLevel : Byte
+{
+    kUser = 0,
+    kSupervisor = 1,
+    // 2: reserved
+    kMachine = 3
+};
+
 } // namespace yarvs
 
 #endif // INCLUDE_COMMON_HPP

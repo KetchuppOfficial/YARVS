@@ -1,13 +1,11 @@
-#include <concepts>
+#include <format>
 #include <functional>
 #include <stdexcept>
-#include <type_traits>
 
 #include <unistd.h>
 
 #include "hart.hpp"
 #include "common.hpp"
-#include "executor.hpp"
 #include "instruction.hpp"
 #include "bits_manipulation.hpp"
 
@@ -16,403 +14,450 @@ namespace yarvs
 
 // RVI integer register-register operations
 
-template<std::regular_invocable<DoubleWord, DoubleWord> F>
-bool exec_rvi_reg_reg(const Instruction &instr, Hart &h, F bin_op)
-noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+bool Hart::exec_add(Hart &h, const Instruction &instr)
 {
-    auto &gprs = h.gprs();
-    gprs.set_reg(instr.rd, bin_op(gprs.get_reg(instr.rs1), gprs.get_reg(instr.rs2)));
-    h.set_pc(h.get_pc() + sizeof(RawInstruction));
-    return false;
+    h.exec_rvi_reg_reg(instr, std::plus{});
+    return true;
 }
 
-bool exec_add(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_sub(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_reg(instr, h, std::plus{});
+    h.exec_rvi_reg_reg(instr, std::minus{});
+    return true;
 }
 
-bool exec_sub(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_and(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_reg(instr, h, std::minus{});
+    h.exec_rvi_reg_reg(instr, std::bit_and{});
+    return true;
 }
 
-bool exec_and(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_xor(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_reg(instr, h, std::bit_and{});
+    h.exec_rvi_reg_reg(instr, std::bit_xor{});
+    return true;
 }
 
-bool exec_xor(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_or(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_reg(instr, h, std::bit_xor{});
+    h.exec_rvi_reg_reg(instr, std::bit_or{});
+    return true;
 }
 
-bool exec_or(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_sltu(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_reg(instr, h, std::bit_or{});
+    h.exec_rvi_reg_reg(instr, std::less{});
+    return true;
 }
 
-bool exec_sltu(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_slt(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_reg(instr, h, std::less{});
-}
-
-bool exec_slt(Hart &h, const Instruction &instr) noexcept
-{
-    return exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs)
+    h.exec_rvi_reg_reg(instr, [](auto lhs, auto rhs)
     {
         return to_signed(lhs) < to_signed(rhs);
     });
+    return true;
 }
 
 // RVI64 integer register-register operations
 
-template<std::regular_invocable<DoubleWord, DoubleWord> F>
-bool exec_rv64i_reg_reg(const Instruction &instr, Hart &h, F bin_op)
-noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+bool Hart::exec_addw(Hart &h, const Instruction &instr)
 {
-    auto &gprs = h.gprs();
-    auto res = bin_op(gprs.get_reg(instr.rs1), gprs.get_reg(instr.rs2));
-    gprs.set_reg(instr.rd, sext<32, DoubleWord>(static_cast<Word>(res)));
-    h.set_pc(h.get_pc() + sizeof(RawInstruction));
-    return false;
+    h.exec_rv64i_reg_reg(instr, std::plus{});
+    return true;
 }
 
-bool exec_addw(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_subw(Hart &h, const Instruction &instr)
 {
-    return exec_rv64i_reg_reg(instr, h, std::plus{});
+    h.exec_rv64i_reg_reg(instr, std::minus{});
+    return true;
 }
 
-bool exec_subw(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_sll(Hart &h, const Instruction &instr)
 {
-    return exec_rv64i_reg_reg(instr, h, std::minus{});
-}
-
-bool exec_sll(Hart &h, const Instruction &instr) noexcept
-{
-    return exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs)
+    h.exec_rvi_reg_reg(instr, [](auto lhs, auto rhs)
     {
         return lhs << mask_bits<5, 0>(rhs);
     });
+    return true;
 }
 
-bool exec_srl(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_srl(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs)
+    h.exec_rvi_reg_reg(instr, [](auto lhs, auto rhs)
     {
         return lhs >> mask_bits<5, 0>(rhs);
     });
+    return true;
 }
 
-bool exec_sra(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_sra(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_reg(instr, h, [](auto lhs, auto rhs)
+    h.exec_rvi_reg_reg(instr, [](auto lhs, auto rhs)
     {
         return to_unsigned(to_signed(lhs) >> mask_bits<5, 0>(rhs));
     });
+    return true;
 }
 
-bool exec_sllw(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_sllw(Hart &h, const Instruction &instr)
 {
-    return exec_rv64i_reg_reg(instr, h, [](auto lhs, auto rhs)
+    h.exec_rv64i_reg_reg(instr, [](auto lhs, auto rhs)
     {
         return lhs << mask_bits<4, 0>(rhs);
     });
+    return true;
 }
 
-bool exec_srlw(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_srlw(Hart &h, const Instruction &instr)
 {
-    return exec_rv64i_reg_reg(instr, h, [](auto lhs, auto rhs)
+    h.exec_rv64i_reg_reg(instr, [](auto lhs, auto rhs)
     {
         return lhs >> mask_bits<4, 0>(rhs);
     });
+    return true;
 }
 
-bool exec_sraw(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_sraw(Hart &h, const Instruction &instr)
 {
-    return exec_rv64i_reg_reg(instr, h, [](auto lhs, auto rhs)
+    h.exec_rv64i_reg_reg(instr, [](auto lhs, auto rhs)
     {
         return to_signed(lhs) >> mask_bits<4, 0>(rhs);
     });
+    return true;
 }
 
 // RVI integer register-immediate instructions
 
-template<std::regular_invocable<DoubleWord, DoubleWord> F>
-bool exec_rvi_reg_imm(const Instruction &instr, Hart &h, F bin_op)
-noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+bool Hart::exec_addi(Hart &h, const Instruction &instr)
 {
-    auto &gprs = h.gprs();
-    gprs.set_reg(instr.rd, bin_op(gprs.get_reg(instr.rs1), instr.imm));
-    h.set_pc(h.get_pc() + sizeof(RawInstruction));
-    return false;
+    h.exec_rvi_reg_imm(instr, std::plus{});
+    return true;
 }
 
-bool exec_addi(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_andi(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_imm(instr, h, std::plus{});
+    h.exec_rvi_reg_imm(instr, std::bit_and{});
+    return true;
 }
 
-bool exec_andi(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_ori(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_imm(instr, h, std::bit_and{});
+    h.exec_rvi_reg_imm(instr, std::bit_or{});
+    return true;
 }
 
-bool exec_ori(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_xori(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_imm(instr, h, std::bit_or{});
+    h.exec_rvi_reg_imm(instr, std::bit_xor{});
+    return true;
 }
 
-bool exec_xori(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_sltiu(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_imm(instr, h, std::bit_xor{});
+    h.exec_rvi_reg_imm(instr, std::less{});
+    return true;
 }
 
-bool exec_sltiu(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_slti(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_imm(instr, h, std::less{});
-}
-
-bool exec_slti(Hart &h, const Instruction &instr) noexcept
-{
-    return exec_rvi_reg_imm(instr, h, [](auto lhs, auto rhs)
+    h.exec_rvi_reg_imm(instr, [](auto lhs, auto rhs)
     {
         return to_signed(lhs) < to_signed(rhs);
     });
+    return true;
 }
 
-bool exec_lui(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_lui(Hart &h, const Instruction &instr)
 {
-    auto &gprs = h.gprs();
-    gprs.set_reg(instr.rd, instr.imm);
-    h.set_pc(h.get_pc() + sizeof(RawInstruction));
-    return false;
+    h.gprs_.set_reg(instr.rd, instr.imm);
+    h.pc_ += sizeof(RawInstruction);
+    return true;
 }
 
-bool exec_auipc(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_auipc(Hart &h, const Instruction &instr)
 {
-    h.gprs().set_reg(instr.rd, h.get_pc() + instr.imm);
-    h.set_pc(h.get_pc() + sizeof(RawInstruction));
-    return false;
+    h.gprs_.set_reg(instr.rd, h.pc_ + instr.imm);
+    h.pc_ += sizeof(RawInstruction);
+    return true;
 }
 
 // RV64I integer register-immediate instructions
 
-template<std::regular_invocable<DoubleWord, DoubleWord> F>
-bool exec_rv64i_reg_imm(const Instruction &instr, Hart &h, F bin_op)
-noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+bool Hart::exec_addiw(Hart &h, const Instruction &instr)
 {
-    auto &gprs = h.gprs();
-    auto res = bin_op(gprs.get_reg(instr.rs1), instr.imm);
-    gprs.set_reg(instr.rd, sext<32, DoubleWord>(static_cast<Word>(res)));
-    h.set_pc(h.get_pc() + sizeof(RawInstruction));
-    return false;
+    h.exec_rv64i_reg_imm(instr, std::plus{});
+    return true;
 }
 
-bool exec_addiw(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_slli(Hart &h, const Instruction &instr)
 {
-    return exec_rv64i_reg_imm(instr, h, std::plus{});
-}
-
-bool exec_slli(Hart &h, const Instruction &instr) noexcept
-{
-    return exec_rvi_reg_imm(instr, h, [](auto lhs, auto rhs)
+    h.exec_rvi_reg_imm(instr, [](auto lhs, auto rhs)
     {
         return lhs << mask_bits<5, 0>(rhs);
     });
+    return true;
 }
 
-bool exec_srli(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_srli(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_imm(instr, h, [](auto lhs, auto rhs)
+    h.exec_rvi_reg_imm(instr, [](auto lhs, auto rhs)
     {
         return lhs >> mask_bits<5, 0>(rhs);
     });
+    return true;
 }
 
-bool exec_srai(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_srai(Hart &h, const Instruction &instr)
 {
-    return exec_rvi_reg_imm(instr, h, [](auto lhs, auto rhs)
+    h.exec_rvi_reg_imm(instr, [](auto lhs, auto rhs)
     {
         return to_unsigned(to_signed(lhs) >> mask_bits<5, 0>(rhs));
     });
+    return true;
 }
 
-bool exec_slliw(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_slliw(Hart &h, const Instruction &instr)
 {
-    return exec_rv64i_reg_imm(instr, h, [](auto lhs, auto rhs)
+    h.exec_rv64i_reg_imm(instr, [](auto lhs, auto rhs)
     {
         return lhs << mask_bits<5, 0>(rhs);
     });
+    return true;
 }
 
-bool exec_srliw(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_srliw(Hart &h, const Instruction &instr)
 {
-    return exec_rv64i_reg_imm(instr, h, [](auto lhs, auto rhs)
+    h.exec_rv64i_reg_imm(instr, [](auto lhs, auto rhs)
     {
         return lhs >> mask_bits<5, 0>(rhs);
     });
+    return true;
 }
 
-bool exec_sraiw(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_sraiw(Hart &h, const Instruction &instr)
 {
-    return exec_rv64i_reg_imm(instr, h, [](auto lhs, auto rhs)
+    h.exec_rv64i_reg_imm(instr, [](auto lhs, auto rhs)
     {
         return to_signed(lhs) >> mask_bits<5, 0>(rhs);
     });
+    return true;
 }
 
 // RVI control transfer instructions
 
-bool exec_jal(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_jal(Hart &h, const Instruction &instr)
 {
-    h.gprs().set_reg(instr.rd, h.get_pc() + sizeof(RawInstruction));
-    h.set_pc(h.get_pc() + instr.imm);
+    h.gprs_.set_reg(instr.rd, h.pc_ + sizeof(RawInstruction));
+    h.pc_ += instr.imm;
     return true;
 }
 
-bool exec_jalr(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_jalr(Hart &h, const Instruction &instr)
 {
-    auto &gprs = h.gprs();
-    gprs.set_reg(instr.rd, h.get_pc() + sizeof(RawInstruction));
-    h.set_pc((gprs.get_reg(instr.rs1) + instr.imm) & ~DoubleWord{1});
+    h.gprs_.set_reg(instr.rd, h.pc_ + sizeof(RawInstruction));
+    h.pc_ = (h.gprs_.get_reg(instr.rs1) + instr.imm) & ~DoubleWord{1};
     return true;
 }
 
-template<std::predicate<DoubleWord, DoubleWord> F>
-bool exec_cond_branch(const Instruction &instr, Hart &h, F bin_op)
-noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+bool Hart::exec_beq(Hart &h, const Instruction &instr)
 {
-    const auto &gprs = h.gprs();
-    if (bin_op(gprs.get_reg(instr.rs1), gprs.get_reg(instr.rs2)))
-        h.set_pc(h.get_pc() + instr.imm);
-    else
-        h.set_pc(h.get_pc() + sizeof(RawInstruction));
+    h.exec_cond_branch(instr, std::equal_to{});
     return true;
 }
 
-bool exec_beq(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_bne(Hart &h, const Instruction &instr)
 {
-    return exec_cond_branch(instr, h, std::equal_to{});
+    h.exec_cond_branch(instr, std::not_equal_to{});
+    return true;
 }
 
-bool exec_bne(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_blt(Hart &h, const Instruction &instr)
 {
-    return exec_cond_branch(instr, h, std::not_equal_to{});
-}
-
-bool exec_blt(Hart &h, const Instruction &instr) noexcept
-{
-    return exec_cond_branch(instr, h, [](auto lhs, auto rhs)
+    h.exec_cond_branch(instr, [](auto lhs, auto rhs)
     {
         return to_signed(lhs) < to_signed(rhs);
     });
+    return true;
 }
 
-bool exec_bltu(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_bltu(Hart &h, const Instruction &instr)
 {
-    return exec_cond_branch(instr, h, std::less{});
+    h.exec_cond_branch(instr, std::less{});
+    return true;
 }
 
-bool exec_bge(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_bge(Hart &h, const Instruction &instr)
 {
-    return exec_cond_branch(instr, h, [](auto lhs, auto rhs)
+    h.exec_cond_branch(instr, [](auto lhs, auto rhs)
     {
         return to_signed(lhs) >= to_signed(rhs);
     });
+    return true;
 }
 
-bool exec_bgeu(Hart &h, const Instruction &instr) noexcept
+bool Hart::exec_bgeu(Hart &h, const Instruction &instr)
 {
-    return exec_cond_branch(instr, h, std::greater_equal{});
+    h.exec_cond_branch(instr, std::greater_equal{});
+    return true;
 }
 
 // RV64I load and store instructions
 
-template<riscv_type T>
-bool exec_load(Hart &h, const Instruction &instr)
-{
-    auto &gprs = h.gprs();
-    auto value = h.memory().load<T>(gprs.get_reg(instr.rs1) + instr.imm);
-    gprs.set_reg(instr.rd, sext<kNBits<T>, DoubleWord>(value));
-    h.set_pc(h.get_pc() + sizeof(RawInstruction));
-    return false;
-}
+bool Hart::exec_ld(Hart &h, const Instruction &instr) { return h.exec_load<DoubleWord>(instr); }
+bool Hart::exec_lw(Hart &h, const Instruction &instr) { return h.exec_load<Word>(instr); }
+bool Hart::exec_lh(Hart &h, const Instruction &instr) { return h.exec_load<HalfWord>(instr); }
+bool Hart::exec_lb(Hart &h, const Instruction &instr) { return h.exec_load<Byte>(instr); }
 
-bool exec_ld(Hart &h, const Instruction &instr) { return exec_load<DoubleWord>(h, instr); }
-bool exec_lw(Hart &h, const Instruction &instr) { return exec_load<Word>(h, instr); }
-bool exec_lh(Hart &h, const Instruction &instr) { return exec_load<HalfWord>(h, instr); }
-bool exec_lb(Hart &h, const Instruction &instr) { return exec_load<Byte>(h, instr); }
+bool Hart::exec_lwu(Hart &h, const Instruction &instr) { return h.exec_uload<Word>(instr); }
+bool Hart::exec_lhu(Hart &h, const Instruction &instr) { return h.exec_uload<HalfWord>(instr); }
+bool Hart::exec_lbu(Hart &h, const Instruction &instr) { return h.exec_uload<Byte>(instr); }
 
-template<typename T>
-requires riscv_type<T> && (!std::is_same_v<T, DoubleWord>)
-bool exec_uload(Hart &h, const Instruction &instr)
-{
-    auto &gprs = h.gprs();
-    auto value = h.memory().load<T>(gprs.get_reg(instr.rs1) + instr.imm);
-    gprs.set_reg(instr.rd, static_cast<DoubleWord>(value));
-    h.set_pc(h.get_pc() + sizeof(RawInstruction));
-    return false;
-}
-
-bool exec_lwu(Hart &h, const Instruction &instr) { return exec_uload<Word>(h, instr); }
-bool exec_lhu(Hart &h, const Instruction &instr) { return exec_uload<HalfWord>(h, instr); }
-bool exec_lbu(Hart &h, const Instruction &instr) { return exec_uload<Byte>(h, instr); }
-
-template<riscv_type T>
-bool exec_store(Hart &h, const Instruction &instr)
-{
-    auto &gprs = h.gprs();
-    h.memory().store(gprs.get_reg(instr.rs1) + instr.imm, static_cast<T>(gprs.get_reg(instr.rs2)));
-    h.set_pc(h.get_pc() + sizeof(RawInstruction));
-    return false;
-}
-
-bool exec_sd(Hart &h, const Instruction &instr) { return exec_store<DoubleWord>(h, instr); }
-bool exec_sw(Hart &h, const Instruction &instr) { return exec_store<Word>(h, instr); }
-bool exec_sh(Hart &h, const Instruction &instr) { return exec_store<HalfWord>(h, instr); }
-bool exec_sb(Hart &h, const Instruction &instr) { return exec_store<Byte>(h, instr); }
+bool Hart::exec_sd(Hart &h, const Instruction &instr) { return h.exec_store<DoubleWord>(instr); }
+bool Hart::exec_sw(Hart &h, const Instruction &instr) { return h.exec_store<Word>(instr); }
+bool Hart::exec_sh(Hart &h, const Instruction &instr) { return h.exec_store<HalfWord>(instr); }
+bool Hart::exec_sb(Hart &h, const Instruction &instr) { return h.exec_store<Byte>(instr); }
 
 // RVI memory ordering instructions
 
-bool exec_fence(Hart &h, const Instruction &instr) { return false; } // ignore
+bool Hart::exec_fence([[maybe_unused]] Hart &h, [[maybe_unused]] const Instruction &instr)
+{
+    return true; // ignore
+}
 
 // RVI environment call and breakpoints
 
-bool exec_ecall(Hart &h, [[maybe_unused]] const Instruction &instr)
+bool Hart::exec_ecall(Hart &h, [[maybe_unused]] const Instruction &instr)
 {
-    switch (auto syscall_num = h.gprs().get_reg(Hart::kSyscallNumReg))
+    switch (auto syscall_num = h.gprs_.get_reg(Hart::kSyscallNumReg))
     {
         case 64: // write
         {
-            auto &gprs = h.gprs();
-            auto fd = gprs.get_reg(Hart::kSyscallArgRegs[0]);
-            auto *ptr = h.memory().host_ptr(gprs.get_reg(Hart::kSyscallArgRegs[1]));
-            auto size = gprs.get_reg(Hart::kSyscallArgRegs[2]);
+            auto fd = h.gprs_.get_reg(Hart::kSyscallArgRegs[0]);
+            const auto va = h.gprs_.get_reg(Hart::kSyscallArgRegs[1]);
+            auto maybe_ptr = h.mem_.host_ptr(va);
+            if (!maybe_ptr.has_value()) [[unlikely]]
+            {
+                h.raise_exception(maybe_ptr.error(), va);
+                return false;
+            }
 
-            auto res = write(fd, reinterpret_cast<const char *>(ptr), size);
+            auto size = h.gprs_.get_reg(Hart::kSyscallArgRegs[2]);
 
-            gprs.set_reg(Hart::kSyscallRetReg, res);
-            h.set_pc(h.get_pc() + sizeof(RawInstruction));
+            auto res = write(fd, reinterpret_cast<const char *>(*maybe_ptr), size);
+
+            h.gprs_.set_reg(Hart::kSyscallRetReg, res);
+            h.pc_ += sizeof(RawInstruction);
             break;
         }
         case 93: // exit
-            h.stop();
-            h.set_status(h.gprs().get_reg(Hart::kSyscallRetReg));
+            h.run_ = false;
+            h.status_ = h.gprs_.get_reg(Hart::kSyscallRetReg);
             break;
         default:
-            throw std::runtime_error{std::format("System call {:#x} is not supported",
-                                                 syscall_num)};
+            throw std::runtime_error{std::format("System call {:#x} at pc {:#x} is not supported",
+                                                 syscall_num, h.pc_)};
     }
 
     return true;
 }
 
-bool exec_ebreak(Hart &h, [[maybe_unused]] const Instruction &instr) noexcept
+bool Hart::exec_ebreak(Hart &h, [[maybe_unused]] const Instruction &instr)
 {
-    h.stop();
+    h.run_ = false;
     return true;
 }
 
-} // namespace yarvs
+// Zicsr extension
 
-#include "executor_table.hpp"
+bool Hart::exec_csrrc(Hart &h, const Instruction &instr)
+{
+    h.exec_zicsr_reg_reg(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
+    return true;
+}
+
+bool Hart::exec_csrrci(Hart &h, const Instruction &instr)
+{
+    h.exec_zicsr_reg_imm(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
+    return true;
+}
+
+bool Hart::exec_csrrs(Hart &h, const Instruction &instr)
+{
+    h.exec_zicsr_reg_reg(instr, std::bit_or{});
+    return true;
+}
+
+bool Hart::exec_csrrsi(Hart &h, const Instruction &instr)
+{
+    h.exec_zicsr_reg_imm(instr, std::bit_or{});
+    return true;
+}
+
+bool Hart::exec_csrrw(Hart &h, const Instruction &instr)
+{
+    auto csr = h.csrs_.get_reg(instr.csr);
+    h.csrs_.set_reg(instr.csr, h.gprs_.get_reg(instr.rs1));
+    h.gprs_.set_reg(instr.rd, csr);
+    h.pc_ += sizeof(RawInstruction);
+    return true;
+}
+
+bool Hart::exec_csrrwi(Hart &h, const Instruction &instr)
+{
+    auto csr = h.csrs_.get_reg(instr.csr);
+    h.csrs_.set_reg(instr.csr, instr.imm);
+    h.gprs_.set_reg(instr.rd, csr);
+    h.pc_ += sizeof(RawInstruction);
+    return true;
+}
+
+// System instructions
+
+bool Hart::exec_sret(Hart &h, const Instruction &instr)
+{
+    SStatus sstatus = h.csrs_.get_sstatus();
+    auto old_priv_mode = static_cast<PrivilegeLevel>(sstatus.get_spp());
+    h.priv_level_ = old_priv_mode;
+    sstatus.set_sie(sstatus.get_spie());
+    sstatus.set_spie(true);
+    sstatus.set_spp(PrivilegeLevel::kUser);
+    h.csrs_.set_sstatus(sstatus);
+
+    if (old_priv_mode != PrivilegeLevel::kMachine)
+    {
+        MStatus mstatus = h.csrs_.get_mstatus();
+        mstatus.set_mprv(false);
+        h.csrs_.set_mstatus(mstatus);
+    }
+
+    h.pc_ = h.csrs_.get_sepc();
+
+    return true;
+}
+
+bool Hart::exec_mret(Hart &h, const Instruction &instr)
+{
+    MStatus mstatus = h.csrs_.get_mstatus();
+    h.priv_level_ = static_cast<PrivilegeLevel>(mstatus.get_mpp());
+    mstatus.set_mie(mstatus.get_mpie());
+    mstatus.set_mpie(true);
+    mstatus.set_mpp(PrivilegeLevel::kUser);
+    h.csrs_.set_mstatus(mstatus);
+
+    h.pc_ = h.csrs_.get_mepc();
+
+    return true;
+}
+
+bool Hart::exec_wfi(Hart &h, const Instruction &instr)
+{
+    throw std::runtime_error{"WFI instruction is not implemented"};
+}
+
+bool Hart::exec_sfence_vma(Hart &h, const Instruction &instr)
+{
+    throw std::runtime_error{"SFENCE.VMA is not implemented"};
+}
+
+} // namespace yarvs

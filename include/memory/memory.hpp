@@ -10,12 +10,11 @@
 #include "common.hpp"
 #include "bits_manipulation.hpp"
 
-#include "supervisor/cs_regfile.hpp"
-
 #include "memory/mmap_wrapper.hpp"
 #include "memory/virtual_address.hpp"
 #include "memory/pte.hpp"
-#include "supervisor/scause.hpp"
+
+#include "privileged/cs_regfile.hpp"
 
 namespace yarvs
 {
@@ -28,10 +27,9 @@ public:
     static constexpr DoubleWord kPageSize = 1 << kPageBits;
     static constexpr std::size_t kPhysMemAmount = 4 * (std::size_t{1} << 30); // 4GB
 
-    explicit Memory(CSRegfile &csrs)
-        : physical_mem_{kPhysMemAmount, MMapWrapper::kRead | MMapWrapper::kWrite}, csrs_{csrs} {}
-
-    using exception_handler = void(*)(CSRegfile &);
+    explicit Memory(CSRegfile &csrs, const PrivilegeLevel &priv_mode)
+        : physical_mem_{kPhysMemAmount, MMapWrapper::kRead | MMapWrapper::kWrite},
+          csrs_{csrs}, priv_level_{priv_mode} {}
 
     enum FaultType
     {
@@ -39,32 +37,29 @@ public:
     };
 
     template<riscv_type T>
-    T load(DoubleWord va)
+    std::expected<T, MCause::Exception> load(DoubleWord va)
     {
+        if (!csrs_.is_satp_active(priv_level_))
+            return pm_load<T>(va);
         auto maybe_pa = translate_address<MemoryAccessType::kRead>(va);
-        if (maybe_pa.has_value()) [[ likely ]]
-            return pm_load<T>(*maybe_pa);
-
-        csrs_.scause.set_exception(SCause::kLoadPageFault);
-        auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
-        handler(csrs_);
-        std::unreachable();
+        if (!maybe_pa.has_value()) [[unlikely]]
+            return std::unexpected{MCause::Exception::kLoadPageFault};
+        return pm_load<T>(*maybe_pa);
     }
 
     template<riscv_type T>
-    void store(DoubleWord va, T value)
+    std::expected<void, MCause::Exception> store(DoubleWord va, T value)
     {
-        auto maybe_pa = translate_address<MemoryAccessType::kWrite>(va);
-        if (maybe_pa.has_value()) [[ likely ]]
+        if (!csrs_.is_satp_active(priv_level_))
+            pm_store(va, value);
+        else
         {
+            auto maybe_pa = translate_address<MemoryAccessType::kWrite>(va);
+            if (!maybe_pa.has_value()) [[unlikely]]
+                return std::unexpected{MCause::Exception::kStoreAMOPageFault};
             pm_store(*maybe_pa, value);
-            return;
         }
-
-        csrs_.scause.set_exception(SCause::kStoreAMOPageFault);
-        auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
-        handler(csrs_);
-        std::unreachable();
+        return {};
     }
 
     template<std::input_iterator It>
@@ -75,28 +70,24 @@ public:
             store(va + i * sizeof(value_type), *first);
     }
 
-    RawInstruction fetch(DoubleWord va)
+    std::expected<RawInstruction, MCause::Exception> fetch(DoubleWord va)
     {
+        if (!csrs_.is_satp_active(priv_level_))
+            return pm_load<RawInstruction>(va);
         auto maybe_pa = translate_address<MemoryAccessType::kExecute>(va);
-        if (maybe_pa.has_value()) [[ likely ]]
-            return pm_load<RawInstruction>(*maybe_pa);
-
-        csrs_.scause.set_exception(SCause::kInstrPageFault);
-        auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
-        handler(csrs_);
-        std::unreachable();
+        if (!maybe_pa.has_value()) [[unlikely]]
+            return std::unexpected{MCause::Exception::kInstrPageFault};
+        return pm_load<RawInstruction>(*maybe_pa);
     }
 
-    const Byte *host_ptr(DoubleWord va)
+    std::expected<const Byte *, MCause::Exception> host_ptr(DoubleWord va)
     {
+        if (!csrs_.is_satp_active(priv_level_))
+            return &physical_mem_[va];
         auto maybe_pa = translate_address<MemoryAccessType::kRead>(va);
-        if (maybe_pa.has_value()) [[likely]]
-            return &physical_mem_[*maybe_pa];
-
-        csrs_.scause.set_exception(SCause::kLoadPageFault);
-        auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
-        handler(csrs_);
-        std::unreachable();
+        if (!maybe_pa.has_value()) [[unlikely]]
+            return std::unexpected{MCause::Exception::kLoadPageFault};
+        return &physical_mem_[*maybe_pa];
     }
 
 private:
@@ -111,7 +102,7 @@ private:
     template<MemoryAccessType kAccessKind>
     std::expected<DoubleWord, FaultType> translate_address(DoubleWord va)
     {
-        switch (auto mode = csrs_.satp.get_mode())
+        switch (auto mode = csrs_.get_satp().get_mode())
         {
             case SATP::Mode::kBare:
                 return va;
@@ -135,7 +126,8 @@ private:
     template<MemoryAccessType kAccessKind, Byte kLevels>
     std::expected<DoubleWord, FaultType> translate(VirtualAddress va)
     {
-        DoubleWord a = csrs_.satp.get_ppn() * kPageSize;
+        const SStatus sstatus = csrs_.get_sstatus();
+        DoubleWord a = csrs_.get_satp().get_ppn() * kPageSize;
 
         PTE pte;
         auto i = kLevels - 1;
@@ -156,18 +148,28 @@ private:
                 continue;
             }
 
-            // I don't use <if constexpr>, because the optimizer is expected to remove certain
-            // control-flow branches.
-            if (kAccessKind == MemoryAccessType::kRead    && !pte.get_R() ||
-                kAccessKind == MemoryAccessType::kWrite   && !pte.get_W() ||
-                kAccessKind == MemoryAccessType::kExecute && !pte.get_E())
+            if constexpr (kAccessKind == MemoryAccessType::kRead)
             {
-                return std::unexpected{FaultType::kPageFault};
+                if (!pte.get_R() || (!sstatus.get_mxr() && pte.get_E()))
+                    return std::unexpected{FaultType::kPageFault};
             }
+            else if constexpr (kAccessKind == MemoryAccessType::kWrite)
+            {
+                if (!pte.get_W())
+                    return std::unexpected{FaultType::kPageFault};
+            }
+            else
+            {
+                if (!pte.get_E())
+                    return std::unexpected{FaultType::kPageFault};
+            }
+
+            if (priv_level_ == PrivilegeLevel::kSupervisor && !sstatus.get_sum() && pte.get_U())
+                return std::unexpected{FaultType::kPageFault};
 
             if (!pte.get_A() || (kAccessKind == MemoryAccessType::kWrite && !pte.get_D()))
             {
-                if (pte != PTE{pm_load<DoubleWord>(pa)})
+                if (pte != pm_load<DoubleWord>(pa))
                     continue;
 
                 pte.set_A(true);
@@ -175,7 +177,7 @@ private:
                     pte.set_D(true);
             }
 
-            pm_store(pa, static_cast<DoubleWord>(pte));
+            pm_store(pa, +pte);
             return (pte.get_ppn() << kPageBits) | va.get_page_offset();
         }
     }
@@ -188,6 +190,7 @@ private:
 
     MMapWrapper physical_mem_;
     CSRegfile &csrs_;
+    const PrivilegeLevel &priv_level_;
 };
 
 } // namespace yarvs

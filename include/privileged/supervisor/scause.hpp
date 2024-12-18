@@ -1,5 +1,5 @@
-#ifndef INCLUDE_SUPERVISOR_SCAUSE_HPP
-#define INCLUDE_SUPERVISOR_SCAUSE_HPP
+#ifndef INCLUDE_PRIVILEGED_SUPERVISOR_SCAUSE_HPP
+#define INCLUDE_PRIVILEGED_SUPERVISOR_SCAUSE_HPP
 
 #include <utility>
 
@@ -36,6 +36,8 @@ public:
         kHardwareError = 19
         // 20-23: reserved
         // 24-31: designated for custom use
+        // 32-47: reserved
+        // 48-63: designated for custom use
         // >= 64: reserved
     };
 
@@ -53,18 +55,20 @@ public:
         // >= 16: designated for platform use
     };
 
-    SCause() noexcept : value_{DoubleWord{1} << 63} {} // initialize with reserved value
-    SCause(DoubleWord value) noexcept : value_{value} {}
+    constexpr SCause() noexcept : value_{DoubleWord{1} << 63} {} // initialize with reserved value
+    constexpr SCause(DoubleWord value) noexcept : value_{value} {}
 
-    std::pair<DoubleWord, bool> get_cause() const noexcept
+    constexpr operator DoubleWord() noexcept { return value_; }
+
+    constexpr std::pair<DoubleWord, bool> get_cause() const noexcept
     {
         return std::pair{mask_bits<62, 0>(value_), static_cast<bool>(mask_bit<63>(value_))};
     }
 
-    void set_interrupt(Interrupt i) noexcept { value_ = i | (DoubleWord{1} << 63); }
-    void set_exception(Exception e) noexcept { value_ = e & ~(DoubleWord{1} << 63); }
+    constexpr void set_interrupt(Interrupt i) noexcept { value_ = set_bit<63>(+i, true); }
+    constexpr void set_exception(Exception e) noexcept { value_ = set_bit<63>(+e, false); }
 
-    const char *what() const noexcept
+    constexpr const char *what() const noexcept
     {
         const auto [value, is_int] = get_cause();
 
@@ -129,4 +133,4 @@ private:
 
 } // namespace yarvs
 
-#endif // INCLUDE_SUPERVISOR_SCAUSE_HPP
+#endif // INCLUDE_PRIVILEGED_SUPERVISOR_SCAUSE_HPP
