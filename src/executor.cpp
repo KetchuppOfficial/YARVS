@@ -329,7 +329,7 @@ bool exec_bgeu(Hart &h, const Instruction &instr) noexcept
 // RV64I load and store instructions
 
 template<riscv_type T>
-bool exec_load(Hart &h, const Instruction &instr) noexcept
+bool exec_load(Hart &h, const Instruction &instr)
 {
     auto &gprs = h.gprs();
     auto value = h.memory().load<T>(gprs.get_reg(instr.rs1) + instr.imm);
@@ -338,14 +338,14 @@ bool exec_load(Hart &h, const Instruction &instr) noexcept
     return false;
 }
 
-bool exec_ld(Hart &h, const Instruction &instr) noexcept { return exec_load<DoubleWord>(h, instr); }
-bool exec_lw(Hart &h, const Instruction &instr) noexcept { return exec_load<Word>(h, instr); }
-bool exec_lh(Hart &h, const Instruction &instr) noexcept { return exec_load<HalfWord>(h, instr); }
-bool exec_lb(Hart &h, const Instruction &instr) noexcept { return exec_load<Byte>(h, instr); }
+bool exec_ld(Hart &h, const Instruction &instr) { return exec_load<DoubleWord>(h, instr); }
+bool exec_lw(Hart &h, const Instruction &instr) { return exec_load<Word>(h, instr); }
+bool exec_lh(Hart &h, const Instruction &instr) { return exec_load<HalfWord>(h, instr); }
+bool exec_lb(Hart &h, const Instruction &instr) { return exec_load<Byte>(h, instr); }
 
 template<typename T>
 requires riscv_type<T> && (!std::is_same_v<T, DoubleWord>)
-bool exec_uload(Hart &h, const Instruction &instr) noexcept
+bool exec_uload(Hart &h, const Instruction &instr)
 {
     auto &gprs = h.gprs();
     auto value = h.memory().load<T>(gprs.get_reg(instr.rs1) + instr.imm);
@@ -354,12 +354,12 @@ bool exec_uload(Hart &h, const Instruction &instr) noexcept
     return false;
 }
 
-bool exec_lwu(Hart &h, const Instruction &instr) noexcept { return exec_uload<Word>(h, instr); }
-bool exec_lhu(Hart &h, const Instruction &instr) noexcept { return exec_uload<HalfWord>(h, instr); }
-bool exec_lbu(Hart &h, const Instruction &instr) noexcept { return exec_uload<Byte>(h, instr); }
+bool exec_lwu(Hart &h, const Instruction &instr) { return exec_uload<Word>(h, instr); }
+bool exec_lhu(Hart &h, const Instruction &instr) { return exec_uload<HalfWord>(h, instr); }
+bool exec_lbu(Hart &h, const Instruction &instr) { return exec_uload<Byte>(h, instr); }
 
 template<riscv_type T>
-bool exec_store(Hart &h, const Instruction &instr) noexcept
+bool exec_store(Hart &h, const Instruction &instr)
 {
     auto &gprs = h.gprs();
     h.memory().store(gprs.get_reg(instr.rs1) + instr.imm, static_cast<T>(gprs.get_reg(instr.rs2)));
@@ -367,10 +367,10 @@ bool exec_store(Hart &h, const Instruction &instr) noexcept
     return false;
 }
 
-bool exec_sd(Hart &h, const Instruction &instr) noexcept { return exec_store<DoubleWord>(h, instr); }
-bool exec_sw(Hart &h, const Instruction &instr) noexcept { return exec_store<Word>(h, instr); }
-bool exec_sh(Hart &h, const Instruction &instr) noexcept { return exec_store<HalfWord>(h, instr); }
-bool exec_sb(Hart &h, const Instruction &instr) noexcept { return exec_store<Byte>(h, instr); }
+bool exec_sd(Hart &h, const Instruction &instr) { return exec_store<DoubleWord>(h, instr); }
+bool exec_sw(Hart &h, const Instruction &instr) { return exec_store<Word>(h, instr); }
+bool exec_sh(Hart &h, const Instruction &instr) { return exec_store<HalfWord>(h, instr); }
+bool exec_sb(Hart &h, const Instruction &instr) { return exec_store<Byte>(h, instr); }
 
 // RVI memory ordering instructions
 
