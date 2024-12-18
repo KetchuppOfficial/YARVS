@@ -112,7 +112,7 @@ public:
             case kLoadPageFault:
                 return "load page fault";
             case kStoreAMOPageFault:
-                return "store AMO/page fault";
+                return "store/AMO page fault";
             case kSoftwareCheck:
                 return "software check";
             case kHardwareError:

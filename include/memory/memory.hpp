@@ -1,7 +1,6 @@
 #ifndef INCLUDE_MEMORY_MEMORY_HPP
 #define INCLUDE_MEMORY_MEMORY_HPP
 
-#include <stdexcept>
 #include <cstddef>
 #include <expected>
 #include <iterator>
@@ -16,6 +15,7 @@
 #include "memory/mmap_wrapper.hpp"
 #include "memory/virtual_address.hpp"
 #include "memory/pte.hpp"
+#include "supervisor/scause.hpp"
 
 namespace yarvs
 {
@@ -28,8 +28,10 @@ public:
     static constexpr DoubleWord kPageSize = 1 << kPageBits;
     static constexpr std::size_t kPhysMemAmount = 4 * (std::size_t{1} << 30); // 4GB
 
-    explicit Memory(const CSRegfile &csrs)
+    explicit Memory(CSRegfile &csrs)
         : physical_mem_{kPhysMemAmount, MMapWrapper::kRead | MMapWrapper::kWrite}, csrs_{csrs} {}
+
+    using exception_handler = void(*)(CSRegfile &);
 
     enum FaultType
     {
@@ -42,8 +44,11 @@ public:
         auto maybe_pa = translate_address<MemoryAccessType::kRead>(va);
         if (maybe_pa.has_value()) [[ likely ]]
             return pm_load<T>(*maybe_pa);
-        else
-            throw std::runtime_error{"page fault"}; // temporary
+
+        csrs_.scause.set_exception(SCause::kLoadPageFault);
+        auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
+        handler(csrs_);
+        std::unreachable();
     }
 
     template<riscv_type T>
@@ -51,9 +56,15 @@ public:
     {
         auto maybe_pa = translate_address<MemoryAccessType::kWrite>(va);
         if (maybe_pa.has_value()) [[ likely ]]
+        {
             pm_store(*maybe_pa, value);
-        else
-            throw std::runtime_error{"page fault"}; // temporary
+            return;
+        }
+
+        csrs_.scause.set_exception(SCause::kStoreAMOPageFault);
+        auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
+        handler(csrs_);
+        std::unreachable();
     }
 
     template<std::input_iterator It>
@@ -69,8 +80,11 @@ public:
         auto maybe_pa = translate_address<MemoryAccessType::kExecute>(va);
         if (maybe_pa.has_value()) [[ likely ]]
             return pm_load<RawInstruction>(*maybe_pa);
-        else
-            throw std::runtime_error{"page fault"}; // temporary
+
+        csrs_.scause.set_exception(SCause::kInstrPageFault);
+        auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
+        handler(csrs_);
+        std::unreachable();
     }
 
     const Byte *host_ptr(DoubleWord va)
@@ -78,8 +92,11 @@ public:
         auto maybe_pa = translate_address<MemoryAccessType::kRead>(va);
         if (maybe_pa.has_value()) [[likely]]
             return &physical_mem_[*maybe_pa];
-        else
-            throw std::runtime_error{"page fault"}; // temporary
+
+        csrs_.scause.set_exception(SCause::kLoadPageFault);
+        auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
+        handler(csrs_);
+        std::unreachable();
     }
 
 private:
@@ -170,7 +187,7 @@ private:
     void pm_store(DoubleWord pa, T value) { *reinterpret_cast<T*>(&physical_mem_[pa]) = value; }
 
     MMapWrapper physical_mem_;
-    const CSRegfile &csrs_;
+    CSRegfile &csrs_;
 };
 
 } // namespace yarvs

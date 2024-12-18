@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <expected>
+#include <stdexcept>
 #include <vector>
 
 #include "common.hpp"
@@ -55,9 +56,9 @@ public:
 
 private:
 
-    static void default_exception_handler()
+    [[noreturn]] static void default_exception_handler(CSRegfile &csrs)
     {
-        //
+        throw std::runtime_error{csrs.scause.what()};
     }
 
     static constexpr DoubleWord kSP = 2;
