@@ -38,26 +38,24 @@ Hart::Hart(const std::filesystem::path &path) : Hart{}
 namespace
 {
 
-template<DoubleWord kStackAddr, DoubleWord kStackPages, std::ranges::input_range R>
-auto collect_pages(R &&loadable_segments)
+template<std::ranges::input_range R>
+auto collect_pages(R &&loadable_segments, DoubleWord stack_top, DoubleWord n_stack_pages)
 {
-    constexpr auto kPageSize = DoubleWord{1} << 12;
-
     std::map<DoubleWord, ELFIO::Elf_Word> pages;
     for (const auto &seg : loadable_segments)
     {
-        auto first_page_addr = mask_bits<63, 12>(seg->get_virtual_address());
-        const auto last_page_addr =
-            mask_bits<63, 12>(seg->get_virtual_address() + seg->get_memory_size());
+        const auto va = seg->get_virtual_address();
+        auto first_page_addr = mask_bits<63, Memory::kPageBits>(va);
+        const auto last_page_addr = mask_bits<63, Memory::kPageBits>(va + seg->get_memory_size());
 
         auto flags = seg->get_flags();
-        for (; first_page_addr <= last_page_addr; first_page_addr += kPageSize)
+        for (; first_page_addr <= last_page_addr; first_page_addr += Memory::kPageSize)
             pages.emplace(first_page_addr, flags);
     }
 
-    constexpr auto kStackLastPage = mask_bits<63, 12>(kStackAddr);
-    for (auto i = 0; i != kStackPages; ++i)
-        pages.emplace(kStackLastPage - i * kPageSize, ELFIO::PF_R | ELFIO::PF_W);
+    const auto kStackLastPage = mask_bits<63, Memory::kPageBits>(stack_top);
+    for (auto i = 0; i != n_stack_pages; ++i)
+        pages.emplace(kStackLastPage - i * Memory::kPageSize, ELFIO::PF_R | ELFIO::PF_W);
 
     return pages;
 }
@@ -113,7 +111,7 @@ void Hart::load_elf(const std::filesystem::path &path)
 
     constexpr DoubleWord kStackPages = 4;
     const std::map<DoubleWord, ELFIO::Elf_Word> pages =
-        collect_pages<kStackAddr, kStackPages>(loadable_segments);
+        collect_pages(loadable_segments, kStackAddr, kStackPages);
 
     const Byte kLevels = csrs_.satp.get_mode() - 5;
     DoubleWord table_end_ppn = 1 + csrs_.satp.get_ppn();
@@ -156,8 +154,9 @@ void Hart::load_elf(const std::filesystem::path &path)
     for (const auto &seg : loadable_segments)
     {
         auto seg_start = reinterpret_cast<const Byte *>(seg->get_data());
-        auto v_page = mask_bits<63, 12>(seg->get_virtual_address());
-        auto pa = va_to_pa.at(v_page) | mask_bits<11, 0>(seg->get_virtual_address());
+        auto v_page = mask_bits<63, Memory::kPageBits>(seg->get_virtual_address());
+        auto pa = va_to_pa.at(v_page) |
+            mask_bits<Memory::kPageBits - 1, 0>(seg->get_virtual_address());
         std::copy_n(seg->get_data(), seg->get_file_size(), &mem_.physical_mem_[pa]);
     }
 
