@@ -24,6 +24,10 @@ class Memory final
 {
 public:
 
+    static constexpr DoubleWord kPageBits = 12;
+    static constexpr DoubleWord kPageSize = 1 << kPageBits;
+    static constexpr std::size_t kPhysMemAmount = 4 * (std::size_t{1} << 30); // 4GB
+
     explicit Memory(const CSRegfile &csrs)
         : physical_mem_{kPhysMemAmount, MMapWrapper::kRead | MMapWrapper::kWrite}, csrs_{csrs} {}
 
@@ -36,7 +40,7 @@ public:
     T load(DoubleWord va)
     {
         auto maybe_pa = translate_address<MemoryAccessType::kRead>(va);
-        if (maybe_pa.has_value())
+        if (maybe_pa.has_value()) [[ likely ]]
             return pm_load<T>(*maybe_pa);
         else
             throw std::runtime_error{"page fault"}; // temporary
@@ -89,10 +93,6 @@ private:
         kExecute
     };
 
-    static constexpr DoubleWord kPageBits = 12;
-    static constexpr DoubleWord kPageSize = 1 << kPageBits;
-    static constexpr std::size_t kPhysMemAmount = 4 * (std::size_t{1} << 30); // 4GB
-
     template<MemoryAccessType kAccessKind>
     std::expected<DoubleWord, FaultType> translate_address(DoubleWord va)
     {
@@ -101,15 +101,15 @@ private:
             case SATP::Mode::kBare:
                 return va;
             case SATP::Mode::kSv39:
-                if (mask_bits<38, 0>(va) != sext<39, DoubleWord>(va))
+                if (va != sext<39, DoubleWord>(va))
                     return std::unexpected{FaultType::kPageFault};
                 return translate<kAccessKind, 3>(va);
             case SATP::Mode::kSv48:
-                if (mask_bits<47, 0>(va) != sext<48, DoubleWord>(va))
+                if (va != sext<48, DoubleWord>(va))
                     return std::unexpected{FaultType::kPageFault};
                 return translate<kAccessKind, 4>(va);
             case SATP::Mode::kSv57:
-                if (mask_bits<56, 0>(va) != sext<57, DoubleWord>(va))
+                if (va != sext<57, DoubleWord>(va))
                     return std::unexpected{FaultType::kPageFault};
                 return translate<kAccessKind, 5>(va);
             default: [[unlikely]]
