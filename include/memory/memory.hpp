@@ -7,6 +7,8 @@
 #include <type_traits>
 #include <utility>
 
+#include <iostream>
+
 #include "common.hpp"
 #include "bits_manipulation.hpp"
 
@@ -45,6 +47,7 @@ public:
         if (maybe_pa.has_value()) [[ likely ]]
             return pm_load<T>(*maybe_pa);
 
+        csrs_.stval = va;
         csrs_.scause.set_exception(SCause::kLoadPageFault);
         auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
         handler(csrs_);
@@ -61,6 +64,7 @@ public:
             return;
         }
 
+        csrs_.stval = va;
         csrs_.scause.set_exception(SCause::kStoreAMOPageFault);
         auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
         handler(csrs_);
@@ -81,6 +85,7 @@ public:
         if (maybe_pa.has_value()) [[ likely ]]
             return pm_load<RawInstruction>(*maybe_pa);
 
+        csrs_.stval = va;
         csrs_.scause.set_exception(SCause::kInstrPageFault);
         auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
         handler(csrs_);
@@ -93,6 +98,7 @@ public:
         if (maybe_pa.has_value()) [[likely]]
             return &physical_mem_[*maybe_pa];
 
+        csrs_.stval = va;
         csrs_.scause.set_exception(SCause::kLoadPageFault);
         auto handler = reinterpret_cast<exception_handler>(csrs_.stvec.get_base());
         handler(csrs_);
@@ -156,18 +162,28 @@ private:
                 continue;
             }
 
-            // I don't use <if constexpr>, because the optimizer is expected to remove certain
-            // control-flow branches.
-            if (kAccessKind == MemoryAccessType::kRead    && !pte.get_R() ||
-                kAccessKind == MemoryAccessType::kWrite   && !pte.get_W() ||
-                kAccessKind == MemoryAccessType::kExecute && !pte.get_E())
+            if constexpr (kAccessKind == MemoryAccessType::kRead)
             {
-                return std::unexpected{FaultType::kPageFault};
+                if (!pte.get_R() || (!csrs_.sstatus.get_mxr() && pte.get_E()))
+                {
+                    std::cerr << "HERE\n";
+                    return std::unexpected{FaultType::kPageFault};
+                }
+            }
+            else if constexpr (kAccessKind == MemoryAccessType::kWrite)
+            {
+                if (!pte.get_W())
+                    return std::unexpected{FaultType::kPageFault};
+            }
+            else
+            {
+                if (!pte.get_E())
+                    return std::unexpected{FaultType::kPageFault};
             }
 
             if (!pte.get_A() || (kAccessKind == MemoryAccessType::kWrite && !pte.get_D()))
             {
-                if (pte != PTE{pm_load<DoubleWord>(pa)})
+                if (pte != pm_load<DoubleWord>(pa))
                     continue;
 
                 pte.set_A(true);
@@ -175,7 +191,7 @@ private:
                     pte.set_D(true);
             }
 
-            pm_store(pa, static_cast<DoubleWord>(pte));
+            pm_store(pa, +pte);
             return (pte.get_ppn() << kPageBits) | va.get_page_offset();
         }
     }

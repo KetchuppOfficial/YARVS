@@ -32,7 +32,15 @@ public:
 
     // mode - current address translation scheme
     Mode get_mode() const noexcept { return Mode{get_bits_r<63, 60, Byte>(value_)}; }
-    void set_mode(Mode m) noexcept { value_ = set_bits<63, 60>(value_, Byte{m}); }
+    void set_mode(Mode m) noexcept
+    {
+        /*
+         * Implementations are not required to support all MODE settings, and if satp is written
+         * with an unsupported MODE, the entire write has no effect; no fields in satp are modified.
+         */
+        if (m == kBare || m == kSv39 || m == kSv48 || m == kSv57)
+            value_ = set_bits<63, 60>(value_, Byte{m});
+    }
 
     // asid - address space identifier
     HalfWord get_asid() const noexcept { return get_bits_r<59, 44, HalfWord>(value_); }

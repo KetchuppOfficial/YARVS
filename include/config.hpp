@@ -6,6 +6,7 @@
 #include <format>
 
 #include "common.hpp"
+#include "memory/memory.hpp"
 #include "supervisor/satp.hpp"
 
 namespace yarvs
@@ -23,6 +24,9 @@ public:
     {
         switch (translation_mode_)
         {
+            case SATP::Mode::kBare:
+                stack_top_ = n_stack_pages_ * Memory::kPageSize;
+                break;
             case SATP::Mode::kSv39:
                 stack_top_ = 0x3ffff14000;
                 break;
