@@ -11,7 +11,6 @@
 #include "hart.hpp"
 #include "common.hpp"
 #include "decoder.hpp"
-#include "executor.hpp"
 
 #include "memory/memory.hpp"
 
@@ -22,6 +21,8 @@ namespace yarvs
 
 Hart::Hart(const Config &config) : mem_{csrs_}, config_{config}, bb_cache_{kDefaultCacheCapacity}
 {
+    csrs_.sstatus.set_mxr(true);
+
     csrs_.satp.set_mode(config_.get_translation_mode());
     csrs_.satp.set_ppn(kPPN);
 
@@ -32,7 +33,7 @@ Hart::Hart(const Config &config) : mem_{csrs_}, config_{config}, bb_cache_{kDefa
 Hart::Hart(const Config &config, const std::filesystem::path &path) : Hart{config}
 {
     load_elf(path);
-    reg_file_.set_reg(kSP, config_.get_stack_top());
+    gprs_.set_reg(kSP, config_.get_stack_top());
 }
 
 namespace
@@ -136,7 +137,7 @@ void Hart::load_elf(const std::filesystem::path &path)
                 pte = 0b10001; // pointer to next level pte
                 assert(pte.is_pointer_to_next_level_pte());
                 pte.set_ppn(table_end_ppn);
-                mem_.store(pa, static_cast<DoubleWord>(pte));
+                mem_.store(pa, +pte);
                 a = table_end_ppn * Memory::kPageSize;
                 ++table_end_ppn;
             }
@@ -151,7 +152,7 @@ void Hart::load_elf(const std::filesystem::path &path)
         pte.set_ppn(data_begin_ppn++);
 
         const auto pa = a + va.get_vpn(0) * sizeof(PTE);
-        mem_.store(pa, static_cast<DoubleWord>(pte));
+        mem_.store(pa, +pte);
     }
 
     for (const auto &seg : loadable_segments)
@@ -180,7 +181,7 @@ std::uintmax_t Hart::run()
         {
             for (const auto &instr : bb_it->second)
             {
-                Executor::execute(*this, instr);
+                execute(instr);
                 ++instr_count;
             }
         }
@@ -194,7 +195,7 @@ std::uintmax_t Hart::run()
             {
                 auto raw_instr = mem_.fetch(pc_);
                 const auto &instr = bb.emplace_back(Decoder::decode(raw_instr));
-                is_terminator = Executor::execute(*this, instr);
+                is_terminator = execute(instr);
             }
 
             bb_cache_.update(bb_pc, std::move(bb));

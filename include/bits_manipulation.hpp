@@ -61,6 +61,14 @@ constexpr T get_bits(T num) noexcept
     return mask_bits<to, from>(num) >> from;
 }
 
+template<std::size_t n, std::unsigned_integral T>
+constexpr T set_bit(T num, bool bit) noexcept
+{
+    static_assert(n < kNBits<T>);
+
+    return num | (static_cast<T>(bit) << n);
+}
+
 template<std::size_t to, std::size_t from, std::unsigned_integral T, std::unsigned_integral U>
 constexpr T set_bits(T num, U value) noexcept
 {

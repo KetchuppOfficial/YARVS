@@ -61,8 +61,8 @@ public:
         return std::pair{mask_bits<62, 0>(value_), static_cast<bool>(mask_bit<63>(value_))};
     }
 
-    void set_interrupt(Interrupt i) noexcept { value_ = i | (DoubleWord{1} << 63); }
-    void set_exception(Exception e) noexcept { value_ = e & ~(DoubleWord{1} << 63); }
+    void set_interrupt(Interrupt i) noexcept { value_ = set_bit<63>(+i, true); }
+    void set_exception(Exception e) noexcept { value_ = set_bit<63>(+e, false); }
 
     const char *what() const noexcept
     {

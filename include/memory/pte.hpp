@@ -19,35 +19,35 @@ public:
 
     // indicates whether the PTE is valid
     bool get_V() const noexcept { return mask_bit<0>(entry_); }
-    void set_V(bool v) noexcept { set<0>(v); }
+    void set_V(bool v) noexcept { entry_ = set_bit<0>(entry_, v); }
 
     // indicates whether the page is readable
     bool get_R() const noexcept { return mask_bit<1>(entry_); }
-    void set_R(bool r) noexcept { set<1>(r); }
+    void set_R(bool r) noexcept { entry_ = set_bit<1>(entry_, r); }
 
     // indicates whether the page is writable
     bool get_W() const noexcept { return mask_bit<2>(entry_); }
-    void set_W(bool w) noexcept { set<2>(w); }
+    void set_W(bool w) noexcept { entry_ = set_bit<2>(entry_, w); }
 
     // indicates whether the page is executable
     bool get_E() const noexcept { return mask_bit<3>(entry_); }
-    void set_E(bool e) noexcept { set<3>(e); }
+    void set_E(bool e) noexcept { entry_ = set_bit<3>(entry_, e); }
 
     // indicates whether the page is accessible to user mode
     bool get_U() const noexcept { return mask_bit<4>(entry_); }
-    void set_U(bool u) noexcept { set<4>(u); }
+    void set_U(bool u) noexcept { entry_ = set_bit<4>(entry_, u); }
 
     // designates global mapping
     bool get_G() const noexcept { return mask_bit<5>(entry_); }
-    void set_G(bool g) noexcept { set<5>(g); }
+    void set_G(bool g) noexcept { entry_ = set_bit<5>(entry_, g); }
 
     // access bit
     bool get_A() const noexcept { return mask_bit<6>(entry_); }
-    void set_A(bool a) noexcept { set<6>(a); }
+    void set_A(bool a) noexcept { entry_ = set_bit<6>(entry_, a); }
 
     // dirty bit
     bool get_D() const noexcept { return mask_bit<7>(entry_); }
-    void set_D(bool d) noexcept { set<7>(d); }
+    void set_D(bool d) noexcept { entry_ = set_bit<7>(entry_, d); }
 
     // physical page number
     DoubleWord get_ppn() const noexcept { return get_bits<53, 10>(entry_); }
@@ -64,13 +64,6 @@ public:
     bool uses_reserved() const noexcept { return mask_bits<63, 54>(entry_); }
 
 private:
-
-    template<std::size_t n>
-    void set(bool x) noexcept
-    {
-        static_assert(n < kNBits<DoubleWord>);
-        entry_ |= (DoubleWord{x} << n);
-    }
 
     DoubleWord entry_;
 };

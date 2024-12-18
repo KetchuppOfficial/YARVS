@@ -18,7 +18,7 @@ protected:
     static constexpr DoubleWord kPageSize = 0x1000;
     static constexpr auto kInstrSize = sizeof(RawInstruction);
 
-    ExecutorTest() { hart.set_pc(kEntry); }
+    ExecutorTest() : hart{Config{SATP::Mode::kBare}} { hart.set_pc(kEntry); }
 
     void add_instruction(RawInstruction instr)
     {
