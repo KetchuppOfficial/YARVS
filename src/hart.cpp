@@ -1,10 +1,10 @@
-#include <cstdint>
 #include <filesystem>
 #include <ranges>
+#include <map>
 #include <stdexcept>
 #include <format>
-#include <map>
-#include <ranges>
+#include <utility>
+#include <cstdint>
 
 #include <elfio/elfio.hpp>
 
@@ -20,19 +20,19 @@
 namespace yarvs
 {
 
-Hart::Hart() : mem_{csrs_}, bb_cache_{kDefaultCacheCapacity}
+Hart::Hart(const Config &config) : mem_{csrs_}, config_{config}, bb_cache_{kDefaultCacheCapacity}
 {
-    csrs_.satp.set_mode(SATP::Mode::kSv48);
+    csrs_.satp.set_mode(config_.get_translation_mode());
     csrs_.satp.set_ppn(kPPN);
 
     static_assert(sizeof(void *) == sizeof(DoubleWord));
     csrs_.stvec.set_base(reinterpret_cast<DoubleWord>(default_exception_handler));
 }
 
-Hart::Hart(const std::filesystem::path &path) : Hart{}
+Hart::Hart(const Config &config, const std::filesystem::path &path) : Hart{config}
 {
     load_elf(path);
-    reg_file_.set_reg(kSP, kStackAddr);
+    reg_file_.set_reg(kSP, config_.get_stack_top());
 }
 
 namespace
@@ -109,23 +109,26 @@ void Hart::load_elf(const std::filesystem::path &path)
     auto is_loadable = [](const auto &seg){ return seg->get_type() == ELFIO::PT_LOAD; };
     auto loadable_segments = std::views::filter(elf.segments, is_loadable);
 
+    auto satp = csrs_.satp;
+    csrs_.satp.set_mode(SATP::Mode::kBare);
+
     constexpr DoubleWord kStackPages = 4;
     const std::map<DoubleWord, ELFIO::Elf_Word> pages =
-        collect_pages(loadable_segments, kStackAddr, kStackPages);
+        collect_pages(loadable_segments, config_.get_stack_top(), config_.get_n_stack_pages());
 
-    const Byte kLevels = csrs_.satp.get_mode() - 5;
-    DoubleWord table_end_ppn = 1 + csrs_.satp.get_ppn();
+    const Byte kLevels = satp.get_mode() - 5;
+    DoubleWord table_end_ppn = 1 + satp.get_ppn();
     DoubleWord data_begin_ppn = kFreePhysMemBegin / Memory::kPageSize;
 
     std::map<DoubleWord, DoubleWord> va_to_pa;
     for (auto [page, rwx] : pages)
     {
         const VirtualAddress va = page;
-        auto a = csrs_.satp.get_ppn() * Memory::kPageSize;
+        auto a = satp.get_ppn() * Memory::kPageSize;
         for (Byte i = kLevels - 1; i > 0; --i)
         {
             const auto pa = a + va.get_vpn(i) * sizeof(PTE);
-            PTE pte = mem_.pm_load<DoubleWord>(pa);
+            PTE pte = mem_.load<DoubleWord>(pa);
             if (pte.get_V())
                 a = pte.get_ppn() * Memory::kPageSize;
             else
@@ -133,7 +136,7 @@ void Hart::load_elf(const std::filesystem::path &path)
                 pte = 0b10001; // pointer to next level pte
                 assert(pte.is_pointer_to_next_level_pte());
                 pte.set_ppn(table_end_ppn);
-                mem_.pm_store(pa, static_cast<DoubleWord>(pte));
+                mem_.store(pa, static_cast<DoubleWord>(pte));
                 a = table_end_ppn * Memory::kPageSize;
                 ++table_end_ppn;
             }
@@ -148,19 +151,21 @@ void Hart::load_elf(const std::filesystem::path &path)
         pte.set_ppn(data_begin_ppn++);
 
         const auto pa = a + va.get_vpn(0) * sizeof(PTE);
-        mem_.pm_store(pa, static_cast<DoubleWord>(pte));
+        mem_.store(pa, static_cast<DoubleWord>(pte));
     }
 
     for (const auto &seg : loadable_segments)
     {
-        auto seg_start = reinterpret_cast<const Byte *>(seg->get_data());
         auto v_page = mask_bits<63, Memory::kPageBits>(seg->get_virtual_address());
         auto pa = va_to_pa.at(v_page) |
             mask_bits<Memory::kPageBits - 1, 0>(seg->get_virtual_address());
-        std::copy_n(seg->get_data(), seg->get_file_size(), &mem_.physical_mem_[pa]);
+        auto seg_start = reinterpret_cast<const Byte *>(seg->get_data());
+        mem_.store(pa, seg_start, seg_start + seg->get_file_size());
     }
 
     pc_ = elf.get_entry();
+
+    csrs_.satp = satp;
 }
 
 std::uintmax_t Hart::run()

@@ -12,6 +12,7 @@
 #include "instruction.hpp"
 #include "reg_file.hpp"
 #include "executor.hpp"
+#include "config.hpp"
 
 #include "memory/memory.hpp"
 
@@ -30,8 +31,8 @@ public:
     static constexpr std::array<std::size_t, 6> kSyscallArgRegs = {10, 11, 12, 13, 14, 15};
     static constexpr std::size_t kSyscallNumReg = 17;
 
-    explicit Hart();
-    explicit Hart(const std::filesystem::path &path);
+    explicit Hart(const Config &config);
+    explicit Hart(const Config &config, const std::filesystem::path &path);
 
     void load_elf(const std::filesystem::path &path);
 
@@ -66,9 +67,9 @@ private:
 
     static constexpr DoubleWord kPPN = 1;
     static constexpr DoubleWord kFreePhysMemBegin = Memory::kPhysMemAmount / 4;
-    static constexpr DoubleWord kStackAddr = 0x7ffe49b14000;
-    static_assert((kStackAddr / Memory::kPageSize) * Memory::kPageSize == kStackAddr);
     Memory mem_;
+
+    Config config_;
 
     static constexpr std::size_t kDefaultCacheCapacity = 64;
     static constexpr std::size_t kDefaultBBLength = 24;

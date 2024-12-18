@@ -1,11 +1,17 @@
-#include <exception>
 #include <filesystem>
+#include <string>
+#include <cstddef>
+#include <utility>
 #include <chrono>
+#include <exception>
 
 #include <CLI/CLI.hpp>
 #include <fmt/base.h>
 
+#include "config.hpp"
 #include "hart.hpp"
+
+#include "supervisor/satp.hpp"
 
 int main(int argc, char **argv) try
 {
@@ -20,9 +26,33 @@ int main(int argc, char **argv) try
     app.add_flag("--perf", perf, "Measure performance: execution time, "
                                  "the number of executed instructions and MIPS");
 
+    std::string translation_mode_str;
+    app.add_option("--translation-mode", translation_mode_str,
+                   "Mode of virtual to physical address translation")
+        ->check(CLI::IsMember({"Sv39", "Sv48", "Sv57"}))
+        ->default_val("Sv48");
+
+    std::size_t n_stack_pages;
+    app.add_option("--n-stack-pages", n_stack_pages, "The number of 4KB pages reserved for stack")
+        ->check(CLI::PositiveNumber)
+        ->default_val(4);
+
     CLI11_PARSE(app, argc, argv);
 
-    yarvs::Hart hart{elf_path};
+    auto translation_mode = [&]
+    {
+        if (translation_mode_str == "Sv39")
+            return yarvs::SATP::Mode::kSv39;
+        else if (translation_mode_str == "Sv48")
+            return yarvs::SATP::Mode::kSv48;
+        else if (translation_mode_str == "Sv57")
+            return yarvs::SATP::Mode::kSv57;
+        else
+            std::unreachable();
+    }();
+
+    yarvs::Config config{translation_mode, n_stack_pages};
+    yarvs::Hart hart{config, elf_path};
 
     auto start = std::chrono::high_resolution_clock::now();
     auto instr_count = hart.run();

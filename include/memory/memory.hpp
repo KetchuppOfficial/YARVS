@@ -84,8 +84,6 @@ public:
 
 private:
 
-    friend class Hart;
-
     enum MemoryAccessType
     {
         kRead,
