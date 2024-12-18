@@ -4,13 +4,14 @@
 #include <stdexcept>
 #include <cstddef>
 #include <expected>
-#include <format>
 #include <iterator>
 #include <type_traits>
+#include <utility>
 
 #include "common.hpp"
 #include "bits_manipulation.hpp"
-#include "csr.hpp"
+
+#include "supervisor/cs_regfile.hpp"
 
 #include "memory/mmap_wrapper.hpp"
 #include "memory/virtual_address.hpp"
@@ -79,6 +80,8 @@ public:
 
 private:
 
+    friend class Hart;
+
     enum MemoryAccessType
     {
         kRead,
@@ -98,25 +101,26 @@ private:
             case SATP::Mode::kBare:
                 return va;
             case SATP::Mode::kSv39:
+                if (mask_bits<38, 0>(va) != sext<39, DoubleWord>(va))
+                    return std::unexpected{FaultType::kPageFault};
                 return translate<kAccessKind, 3>(va);
             case SATP::Mode::kSv48:
+                if (mask_bits<47, 0>(va) != sext<48, DoubleWord>(va))
+                    return std::unexpected{FaultType::kPageFault};
                 return translate<kAccessKind, 4>(va);
             case SATP::Mode::kSv57:
+                if (mask_bits<56, 0>(va) != sext<57, DoubleWord>(va))
+                    return std::unexpected{FaultType::kPageFault};
                 return translate<kAccessKind, 5>(va);
             default: [[unlikely]]
-                throw std::runtime_error{
-                    std::format("Translation mode {} is not supported", Byte{mode})};
+                std::unreachable();
         }
     }
 
     template<MemoryAccessType kAccessKind, Byte kLevels>
-    std::expected<DoubleWord, FaultType> translate(DoubleWord raw_va)
+    std::expected<DoubleWord, FaultType> translate(VirtualAddress va)
     {
-        if (mask_bits<38, 0>(raw_va) != sext<39, DoubleWord>(raw_va))
-            return std::unexpected{FaultType::kPageFault};
-
         DoubleWord a = csrs_.satp.get_ppn() * kPageSize;
-        const VirtualAddress va{raw_va};
 
         PTE pte;
         auto i = kLevels - 1;
@@ -137,7 +141,7 @@ private:
                 continue;
             }
 
-            // I don't use if constexpr, because the optimizer is expected to remove certain
+            // I don't use <if constexpr>, because the optimizer is expected to remove certain
             // control-flow branches.
             if (kAccessKind == MemoryAccessType::kRead    && !pte.get_R() ||
                 kAccessKind == MemoryAccessType::kWrite   && !pte.get_W() ||
@@ -148,19 +152,17 @@ private:
 
             if (!pte.get_A() || (kAccessKind == MemoryAccessType::kWrite && !pte.get_D()))
             {
-                PTE another_pte = pm_load<DoubleWord>(a + va.get_vpn(i) * sizeof(PTE));
-                if (another_pte == pte)
-                {
-                    pte.set_A();
-                    if constexpr (kAccessKind == MemoryAccessType::kWrite)
-                        pte.set_D();
-                    pm_store(pa, static_cast<DoubleWord>(pte));
-                    break;
-                }
-            }
-        }
+                if (pte != PTE{pm_load<DoubleWord>(pa)})
+                    continue;
 
-        return (pte.get_ppn() << kPageBits) | va.get_page_offset();
+                pte.set_A(true);
+                if constexpr (kAccessKind == MemoryAccessType::kWrite)
+                    pte.set_D(true);
+            }
+
+            pm_store(pa, static_cast<DoubleWord>(pte));
+            return (pte.get_ppn() << kPageBits) | va.get_page_offset();
+        }
     }
 
     template<riscv_type T>

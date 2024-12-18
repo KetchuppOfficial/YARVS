@@ -1,5 +1,5 @@
-#ifndef INCLUDE_CSR_HPP
-#define INCLUDE_CSR_HPP
+#ifndef INCLUDE_SUPERVISOR_SATP_HPP
+#define INCLUDE_SUPERVISOR_SATP_HPP
 
 #include "common.hpp"
 #include "bits_manipulation.hpp"
@@ -56,11 +56,6 @@ private:
     DoubleWord value_;
 };
 
-struct CSRegfile final
-{
-    SATP satp;
-};
-
 } // namespace yarvs
 
-#endif // INCLUDE_CSR_HPP
+#endif // INCLUDE_SUPERVISOR_SATP_HPP

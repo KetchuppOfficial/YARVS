@@ -12,10 +12,12 @@
 #include "instruction.hpp"
 #include "reg_file.hpp"
 #include "executor.hpp"
-#include "csr.hpp"
+
+#include "memory/memory.hpp"
 
 #include "cache/lru.hpp"
-#include "memory/memory.hpp"
+
+#include "supervisor/cs_regfile.hpp"
 
 namespace yarvs
 {
@@ -52,11 +54,20 @@ public:
 
 private:
 
+    static void default_exception_handler()
+    {
+        //
+    }
+
+    static constexpr DoubleWord kSP = 2;
     RegFile reg_file_;
     DoubleWord pc_;
     CSRegfile csrs_;
 
+    static constexpr DoubleWord kPPN = 1;
+    static constexpr DoubleWord kFreePhysMemBegin = Memory::kPhysMemAmount / 4;
     static constexpr DoubleWord kStackAddr = 0x7ffe49b14000;
+    static_assert((kStackAddr / Memory::kPageSize) * Memory::kPageSize == kStackAddr);
     Memory mem_;
 
     static constexpr std::size_t kDefaultCacheCapacity = 64;
