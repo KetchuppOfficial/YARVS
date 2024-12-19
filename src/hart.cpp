@@ -13,27 +13,36 @@
 #include "decoder.hpp"
 
 #include "memory/memory.hpp"
-
 #include "memory/virtual_address.hpp"
+
+#include "privileged/xtvec.hpp"
+#include "privileged/supervisor/satp.hpp"
+#include "privileged/supervisor/sstatus.hpp"
 
 namespace yarvs
 {
 
-Hart::Hart(const Config &config) : mem_{csrs_}, config_{config}, bb_cache_{kDefaultCacheCapacity}
-{
-    csrs_.sstatus.set_mxr(true);
+Hart::Hart() : mem_{csrs_, priv_level_}, bb_cache_{kDefaultCacheCapacity} {}
 
-    csrs_.satp.set_mode(config_.get_translation_mode());
-    csrs_.satp.set_ppn(kPPN);
+Hart::Hart(const Config &config, const std::filesystem::path &path) : Hart{}
+{
+    SStatus sstatus;
+    sstatus.set_mxr(true);
+    csrs_.set_sstatus(sstatus);
+
+    SATP satp;
+    satp.set_mode(config.get_translation_mode());
+    satp.set_ppn(kPPN);
+    csrs_.set_satp(satp);
 
     static_assert(sizeof(void *) == sizeof(DoubleWord));
-    csrs_.stvec.set_base(reinterpret_cast<DoubleWord>(default_exception_handler));
-}
+    XTVec stvec;
+    stvec.set_base(reinterpret_cast<DoubleWord>(default_exception_handler));
+    csrs_.set_stvec(stvec);
 
-Hart::Hart(const Config &config, const std::filesystem::path &path) : Hart{config}
-{
-    load_elf(path);
-    gprs_.set_reg(kSP, config_.get_stack_top());
+    load_elf(config, path);
+
+    gprs_.set_reg(kSP, config.get_stack_top());
 }
 
 namespace
@@ -63,7 +72,7 @@ auto collect_pages(R &&loadable_segments, DoubleWord stack_top, DoubleWord n_sta
 
 } // unnamed namespace
 
-void Hart::load_elf(const std::filesystem::path &path)
+void Hart::load_elf(const Config &config, const std::filesystem::path &path)
 {
     ELFIO::elfio elf;
     if (!elf.load(path.native()))
@@ -110,26 +119,23 @@ void Hart::load_elf(const std::filesystem::path &path)
     auto is_loadable = [](const auto &seg){ return seg->get_type() == ELFIO::PT_LOAD; };
     auto loadable_segments = std::views::filter(elf.segments, is_loadable);
 
-    auto satp = csrs_.satp;
-    csrs_.satp.set_mode(SATP::Mode::kBare);
-
     constexpr DoubleWord kStackPages = 4;
     const std::map<DoubleWord, ELFIO::Elf_Word> pages =
-        collect_pages(loadable_segments, config_.get_stack_top(), config_.get_n_stack_pages());
+        collect_pages(loadable_segments, config.get_stack_top(), config.get_n_stack_pages());
 
-    const Byte kLevels = satp.get_mode() - 5;
-    DoubleWord table_end_ppn = 1 + satp.get_ppn();
+    const Byte kLevels = csrs_.get_satp().get_mode() - 5;
+    DoubleWord table_end_ppn = 1 + csrs_.get_satp().get_ppn();
     DoubleWord data_begin_ppn = kFreePhysMemBegin / Memory::kPageSize;
 
     std::map<DoubleWord, DoubleWord> va_to_pa;
     for (auto [page, rwx] : pages)
     {
         const VirtualAddress va = page;
-        auto a = satp.get_ppn() * Memory::kPageSize;
+        auto a = csrs_.get_satp().get_ppn() * Memory::kPageSize;
         for (Byte i = kLevels - 1; i > 0; --i)
         {
             const auto pa = a + va.get_vpn(i) * sizeof(PTE);
-            PTE pte = mem_.load<DoubleWord>(pa);
+            PTE pte = mem_.load<DoubleWord>(pa).value();
             if (pte.get_V())
                 a = pte.get_ppn() * Memory::kPageSize;
             else
@@ -165,12 +171,11 @@ void Hart::load_elf(const std::filesystem::path &path)
     }
 
     pc_ = elf.get_entry();
-
-    csrs_.satp = satp;
 }
 
 std::uintmax_t Hart::run()
 {
+    priv_level_ = PrivilegeLevel::kUser;
     run_ = true;
 
     BasicBlock bb;
@@ -193,8 +198,10 @@ std::uintmax_t Hart::run()
 
             for (bool is_terminator = false; !is_terminator; ++instr_count)
             {
-                auto raw_instr = mem_.fetch(pc_);
-                const auto &instr = bb.emplace_back(Decoder::decode(raw_instr));
+                auto maybe_raw_instr = mem_.fetch(pc_);
+                if (!maybe_raw_instr.has_value()) [[unlikely]]
+                    raise_exception(pc_, maybe_raw_instr.error());
+                const auto &instr = bb.emplace_back(Decoder::decode(*maybe_raw_instr));
                 is_terminator = execute(instr);
             }
 

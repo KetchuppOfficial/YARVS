@@ -297,10 +297,13 @@ bool Hart::exec_ecall(Hart &h, [[maybe_unused]] const Instruction &instr)
         case 64: // write
         {
             auto fd = h.gprs_.get_reg(Hart::kSyscallArgRegs[0]);
-            auto *ptr = h.mem_.host_ptr(h.gprs_.get_reg(Hart::kSyscallArgRegs[1]));
+            const auto va = h.gprs_.get_reg(Hart::kSyscallArgRegs[1]);
+            auto maybe_ptr = h.mem_.host_ptr(va);
+            if (!maybe_ptr.has_value()) [[unlikely]]
+                h.raise_exception(va, maybe_ptr.error());
             auto size = h.gprs_.get_reg(Hart::kSyscallArgRegs[2]);
 
-            auto res = write(fd, reinterpret_cast<const char *>(ptr), size);
+            auto res = write(fd, reinterpret_cast<const char *>(*maybe_ptr), size);
 
             h.gprs_.set_reg(Hart::kSyscallRetReg, res);
             h.pc_ += sizeof(RawInstruction);
@@ -322,6 +325,92 @@ bool Hart::exec_ebreak(Hart &h, [[maybe_unused]] const Instruction &instr)
 {
     h.run_ = false;
     return true;
+}
+
+// Zicsr extension
+
+bool Hart::exec_csrrc(Hart &h, const Instruction &instr)
+{
+    return h.exec_zicsr_reg_reg(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
+}
+
+bool Hart::exec_csrrci(Hart &h, const Instruction &instr)
+{
+    return h.exec_zicsr_reg_imm(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
+}
+
+bool Hart::exec_csrrs(Hart &h, const Instruction &instr)
+{
+    return h.exec_zicsr_reg_reg(instr, std::bit_or{});
+}
+
+bool Hart::exec_csrrsi(Hart &h, const Instruction &instr)
+{
+    return h.exec_zicsr_reg_imm(instr, std::bit_or{});
+}
+
+bool Hart::exec_csrrw(Hart &h, const Instruction &instr)
+{
+    auto csr = h.csrs_.get_reg(instr.csr);
+    h.csrs_.set_reg(instr.csr, h.gprs_.get_reg(instr.rs1));
+    h.gprs_.set_reg(instr.rd, csr);
+    return false;
+}
+
+bool Hart::exec_csrrwi(Hart &h, const Instruction &instr)
+{
+    auto csr = h.csrs_.get_reg(instr.csr);
+    h.csrs_.set_reg(instr.csr, instr.imm);
+    h.gprs_.set_reg(instr.rd, csr);
+    return false;
+}
+
+// System instructions
+
+bool Hart::exec_sret(Hart &h, const Instruction &instr)
+{
+    SStatus sstatus = h.csrs_.get_sstatus();
+    auto old_priv_mode = static_cast<PrivilegeLevel>(sstatus.get_spp());
+    h.priv_level_ = old_priv_mode;
+    sstatus.set_sie(sstatus.get_spie());
+    sstatus.set_spie(true);
+    sstatus.set_spp(PrivilegeLevel::kUser);
+    h.csrs_.set_sstatus(sstatus);
+
+    if (old_priv_mode != PrivilegeLevel::kMachine)
+    {
+        MStatus mstatus = h.csrs_.get_mstatus();
+        mstatus.set_mprv(false);
+        h.csrs_.set_mstatus(mstatus);
+    }
+
+    h.pc_ = h.csrs_.get_sepc();
+
+    return true;
+}
+
+bool Hart::exec_mret(Hart &h, const Instruction &instr)
+{
+    MStatus mstatus = h.csrs_.get_mstatus();
+    h.priv_level_ = static_cast<PrivilegeLevel>(mstatus.get_mpp());
+    mstatus.set_mie(mstatus.get_mpie());
+    mstatus.set_mpie(true);
+    mstatus.set_mpp(PrivilegeLevel::kUser);
+    h.csrs_.set_mstatus(mstatus);
+
+    h.pc_ = h.csrs_.get_mepc();
+
+    return true;
+}
+
+bool Hart::exec_wfi(Hart &h, const Instruction &instr)
+{
+    throw std::runtime_error{"WFI instruction is not implemented"};
+}
+
+bool Hart::exec_sfence_vma(Hart &h, const Instruction &instr)
+{
+    throw std::runtime_error{"SFENCE.VMA is not implemented"};
 }
 
 } // namespace yarvs

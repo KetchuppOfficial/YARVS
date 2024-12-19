@@ -8,10 +8,10 @@
 #include <CLI/CLI.hpp>
 #include <fmt/base.h>
 
-#include "config.hpp"
 #include "hart.hpp"
+#include "config.hpp"
 
-#include "supervisor/satp.hpp"
+#include "privileged/supervisor/satp.hpp"
 
 int main(int argc, char **argv) try
 {

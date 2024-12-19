@@ -128,6 +128,9 @@ def generate_one_instr_case(id : str, info : dict) -> str:
     if "rd" in vars:
         out += ",\n" + " " * 20 + ".rd = get_bits_r<11, 7, Byte>(raw_instr)"
 
+    if "csr" in vars:
+        out += ",\n" + " " * 20 + ".csr = get_bits_r<31, 20, HalfWord>(raw_instr)"
+
     if any(imm_type in vars for imm_type in ["imm12", "shamtd", "shamtw"]):
         out += ",\n" + " " * 20 + ".imm = decode_i_imm(raw_instr)"
     elif all(imm_type in vars for imm_type in ["imm12hi", "imm12lo"]):
@@ -140,6 +143,8 @@ def generate_one_instr_case(id : str, info : dict) -> str:
         out += ",\n" + " " * 20 + ".imm = decode_j_imm(raw_instr)"
     elif all(field in vars for field in ["fm", "pred", "succ"]): # fence instruction
         out += ",\n" + " " * 20 + ".imm = get_bits<31, 20>(raw_instr)"
+    elif "zimm" in vars:
+        out += ",\n" + " " * 20 + ".imm = get_bits<19, 15>(raw_instr)"
 
     out += "\n" + " " * 16 + "};\n" + " " * 12 + "};"
 

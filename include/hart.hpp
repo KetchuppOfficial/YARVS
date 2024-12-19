@@ -8,6 +8,7 @@
 #include <expected>
 #include <stdexcept>
 #include <array>
+#include <utility>
 #include <vector>
 #include <concepts>
 #include <type_traits>
@@ -21,7 +22,9 @@
 
 #include "cache/lru.hpp"
 
-#include "supervisor/cs_regfile.hpp"
+#include "privileged/cs_regfile.hpp"
+
+#include "privileged/supervisor/scause.hpp"
 
 namespace yarvs
 {
@@ -34,10 +37,8 @@ public:
     static constexpr std::array<std::size_t, 6> kSyscallArgRegs = {10, 11, 12, 13, 14, 15};
     static constexpr std::size_t kSyscallNumReg = 17;
 
-    explicit Hart(const Config &config);
+    explicit Hart();
     explicit Hart(const Config &config, const std::filesystem::path &path);
-
-    void load_elf(const std::filesystem::path &path);
 
     // returns the number of executed instructions
     std::uintmax_t run();
@@ -54,12 +55,35 @@ public:
     int get_status() const noexcept { return status_; }
     void set_status(int status) noexcept { status_ = status; }
 
+    PrivilegeLevel get_privilege_level() const noexcept { return priv_level_; }
+
 private:
+
+    void load_elf(const Config &config, const std::filesystem::path &path);
 
     [[noreturn]] static void default_exception_handler(CSRegfile &csrs)
     {
-        throw std::runtime_error{csrs.scause.what()};
+        auto what = csrs.get_scause().what();
+        if (!what)
+            what = "unknown exception";
+        throw std::runtime_error{
+            std::format("exception \"{}\" at address {:#x} while executing instruction at PC {:#x}",
+                        what, csrs.get_stval(), csrs.get_sepc())};
     }
+
+    [[noreturn]] void raise_exception(DoubleWord info, SCause::Exception e)
+    {
+        csrs_.set_sepc(pc_);
+        SCause scause;
+        scause.set_exception(e);
+        csrs_.set_scause(scause);
+        csrs_.set_stval(info);
+        auto handler = reinterpret_cast<exception_handler_type>(csrs_.get_stvec().get_base());
+        handler(csrs_);
+        std::unreachable();
+    }
+
+    using exception_handler_type = std::decay_t<decltype(default_exception_handler)>;
 
     /*
      * Pointer to static method is used instead of pointer to non-static method, because:
@@ -126,8 +150,11 @@ private:
     template<riscv_type T>
     bool exec_load(const Instruction &instr)
     {
-        auto value = mem_.load<T>(gprs_.get_reg(instr.rs1) + instr.imm);
-        gprs_.set_reg(instr.rd, sext<kNBits<T>, DoubleWord>(value));
+        const auto va = gprs_.get_reg(instr.rs1) + instr.imm;
+        auto maybe_value = mem_.load<T>(va);
+        if (!maybe_value.has_value()) [[unlikely]]
+            raise_exception(va, maybe_value.error());
+        gprs_.set_reg(instr.rd, sext<kNBits<T>, DoubleWord>(*maybe_value));
         pc_ += sizeof(RawInstruction);
         return false;
     }
@@ -136,8 +163,11 @@ private:
     requires riscv_type<T> && (!std::is_same_v<T, DoubleWord>)
     bool exec_uload(const Instruction &instr)
     {
-        auto value = mem_.load<T>(gprs_.get_reg(instr.rs1) + instr.imm);
-        gprs_.set_reg(instr.rd, static_cast<DoubleWord>(value));
+        const auto va = gprs_.get_reg(instr.rs1) + instr.imm;
+        auto maybe_value = mem_.load<T>(va);
+        if (!maybe_value.has_value()) [[unlikely]]
+            raise_exception(va, maybe_value.error());
+        gprs_.set_reg(instr.rd, static_cast<DoubleWord>(*maybe_value));
         pc_ += sizeof(RawInstruction);
         return false;
     }
@@ -145,10 +175,35 @@ private:
     template<riscv_type T>
     bool exec_store(const Instruction &instr)
     {
-        mem_.store(gprs_.get_reg(instr.rs1) + instr.imm, static_cast<T>(gprs_.get_reg(instr.rs2)));
+        const auto va = gprs_.get_reg(instr.rs1) + instr.imm;
+        auto maybe_value = mem_.store(va, static_cast<T>(gprs_.get_reg(instr.rs2)));
+        if (!maybe_value.has_value()) [[unlikely]]
+            raise_exception(va, maybe_value.error());
         pc_ += sizeof(RawInstruction);
         return false;
     }
+
+    template<std::regular_invocable<DoubleWord, DoubleWord> F>
+    bool exec_zicsr_reg_reg(const Instruction &instr, F bin_op)
+    noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+    {
+        auto csr = csrs_.get_reg(instr.csr);
+        csrs_.set_reg(instr.csr, bin_op(csr, gprs_.get_reg(instr.rs1)));
+        gprs_.set_reg(instr.rd, csr);
+        return false;
+    }
+
+    template<std::regular_invocable<DoubleWord, DoubleWord> F>
+    bool exec_zicsr_reg_imm(const Instruction &instr, F bin_op)
+    noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+    {
+        auto csr = csrs_.get_reg(instr.csr);
+        csrs_.set_reg(instr.csr, bin_op(csr, instr.imm));
+        gprs_.set_reg(instr.rd, csr);
+        return false;
+    }
+
+    PrivilegeLevel priv_level_ = PrivilegeLevel::kMachine;
 
     static constexpr DoubleWord kSP = 2;
     RegFile gprs_;
@@ -158,8 +213,6 @@ private:
     static constexpr DoubleWord kPPN = 1;
     static constexpr DoubleWord kFreePhysMemBegin = Memory::kPhysMemAmount / 4;
     Memory mem_;
-
-    Config config_;
 
     static constexpr std::size_t kDefaultCacheCapacity = 64;
     static constexpr std::size_t kDefaultBBLength = 24;

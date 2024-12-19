@@ -12,7 +12,7 @@ add_custom_command(
     COMMENT "Generating YAML with description of instructions"
     OUTPUT ${RISCV_YAML}
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/riscv-opcodes
-    COMMAND ${Python_EXECUTABLE} parse.py rv_i rv64_i
+    COMMAND ${Python_EXECUTABLE} parse.py rv_i rv64_i rv_zicsr rv_s rv_system
 )
 
 add_custom_command(

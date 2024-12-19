@@ -16,6 +16,7 @@ struct Instruction final
     reg_index_type rs1;
     reg_index_type rs2;
     reg_index_type rd;
+    HalfWord csr;
     immediate_type imm; // sign-extended on decoding
 };
 

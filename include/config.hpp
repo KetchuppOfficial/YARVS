@@ -6,8 +6,10 @@
 #include <format>
 
 #include "common.hpp"
+
 #include "memory/memory.hpp"
-#include "supervisor/satp.hpp"
+
+#include "privileged/supervisor/satp.hpp"
 
 namespace yarvs
 {
