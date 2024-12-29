@@ -12,6 +12,7 @@ struct Instruction final
     using reg_index_type = Byte; // shall contain at least 5 bits
     using immediate_type = DoubleWord;
 
+    RawInstruction raw;
     InstrID id;
     reg_index_type rs1;
     reg_index_type rs2;

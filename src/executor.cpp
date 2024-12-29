@@ -8,6 +8,8 @@
 #include "common.hpp"
 #include "instruction.hpp"
 #include "bits_manipulation.hpp"
+#include "privileged/cs_regfile.hpp"
+#include "privileged/machine/mcause.hpp"
 
 namespace yarvs
 {
@@ -372,44 +374,35 @@ bool Hart::exec_ebreak(Hart &h, [[maybe_unused]] const Instruction &instr)
 
 bool Hart::exec_csrrc(Hart &h, const Instruction &instr)
 {
-    h.exec_zicsr_reg_reg(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
-    return true;
+    return h.exec_csrrs_csrrc(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
 }
 
 bool Hart::exec_csrrci(Hart &h, const Instruction &instr)
 {
-    h.exec_zicsr_reg_imm(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
-    return true;
+    return h.exec_csrrsi_csrrci(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
 }
 
 bool Hart::exec_csrrs(Hart &h, const Instruction &instr)
 {
-    h.exec_zicsr_reg_reg(instr, std::bit_or{});
-    return true;
+    return h.exec_csrrs_csrrc(instr, std::bit_or{});
 }
 
 bool Hart::exec_csrrsi(Hart &h, const Instruction &instr)
 {
-    h.exec_zicsr_reg_imm(instr, std::bit_or{});
-    return true;
+    return h.exec_csrrsi_csrrci(instr, std::bit_or{});
 }
 
 bool Hart::exec_csrrw(Hart &h, const Instruction &instr)
 {
-    auto csr = h.csrs_.get_reg(instr.csr);
-    h.csrs_.set_reg(instr.csr, h.gprs_.get_reg(instr.rs1));
-    h.gprs_.set_reg(instr.rd, csr);
-    h.pc_ += sizeof(RawInstruction);
-    return true;
+    return h.exec_csrrw_impl(instr, [&gprs = h.gprs_](const Instruction &instr)
+    {
+        return gprs.get_reg(instr.rs1);
+    });
 }
 
 bool Hart::exec_csrrwi(Hart &h, const Instruction &instr)
 {
-    auto csr = h.csrs_.get_reg(instr.csr);
-    h.csrs_.set_reg(instr.csr, instr.imm);
-    h.gprs_.set_reg(instr.rd, csr);
-    h.pc_ += sizeof(RawInstruction);
-    return true;
+    return h.exec_csrrw_impl(instr, &Instruction::imm);
 }
 
 // System instructions

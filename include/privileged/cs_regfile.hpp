@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 
+#include "bits_manipulation.hpp"
 #include "common.hpp"
 
 #include "privileged/xtvec.hpp"
@@ -62,6 +63,15 @@ public:
         assert(i < kNRegs);
         csrs_[i] = csr;
     }
+
+    static auto get_lowest_privilege_level(std::size_t i) noexcept
+    {
+        return static_cast<PrivilegeLevel>(get_bits<9, 8>(i));
+    }
+
+    static bool is_read_only(std::size_t i) noexcept { return get_bits<11, 10>(i) == 0b11; }
+
+    static bool is_for_debug_mode(std::size_t i) noexcept { return 0x7B0 <= i && i <= 0x7BF; }
 
     // supervisor status register
     SStatus get_sstatus() const noexcept { return get_reg(kSStatus); }

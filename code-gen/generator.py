@@ -119,6 +119,7 @@ def generate_one_instr_case(id : str, info : dict) -> str:
     out : str = " " * 8  + f"case {info["match"]}:\n" + \
                 " " * 12  + "return [](RawInstruction raw_instr) noexcept {\n" + \
                 " " * 16  + "return Instruction{\n" + \
+                " " * 20 + f".raw = raw_instr,\n" + \
                 " " * 20 + f".id = InstrID::k{id.upper()}"
 
     if "rs1" in vars:
