@@ -10,6 +10,8 @@
 #include <vector>
 #include <concepts>
 #include <type_traits>
+#include <functional>
+#include <iostream>
 
 #include "common.hpp"
 #include "instruction.hpp"
@@ -65,7 +67,7 @@ private:
         0x00000073  // ecall
     };
 
-    void raise_exception(DoubleWord cause, DoubleWord info)
+    void raise_exception(DoubleWord cause, DoubleWord info) noexcept
     {
         if (eh_mode(cause) == PrivilegeLevel::kMachine)
         {
@@ -101,7 +103,7 @@ private:
         }
     }
 
-    PrivilegeLevel eh_mode(DoubleWord cause) const
+    PrivilegeLevel eh_mode(DoubleWord cause) const noexcept
     {
         if (priv_level_ == PrivilegeLevel::kMachine)
             return PrivilegeLevel::kMachine;
@@ -135,19 +137,19 @@ private:
     }
 
     template<std::regular_invocable<DoubleWord, DoubleWord> F>
+    void exec_rvi_reg_imm(const Instruction &instr, F bin_op)
+    noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+    {
+        gprs_.set_reg(instr.rd, bin_op(gprs_.get_reg(instr.rs1), instr.imm));
+        pc_ += sizeof(RawInstruction);
+    }
+
+    template<std::regular_invocable<DoubleWord, DoubleWord> F>
     void exec_rv64i_reg_reg(const Instruction &instr, F bin_op)
     noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
     {
         auto res = bin_op(gprs_.get_reg(instr.rs1), gprs_.get_reg(instr.rs2));
         gprs_.set_reg(instr.rd, sext<32, DoubleWord>(static_cast<Word>(res)));
-        pc_ += sizeof(RawInstruction);
-    }
-
-    template<std::regular_invocable<DoubleWord, DoubleWord> F>
-    void exec_rvi_reg_imm(const Instruction &instr, F bin_op)
-    noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
-    {
-        gprs_.set_reg(instr.rd, bin_op(gprs_.get_reg(instr.rs1), instr.imm));
         pc_ += sizeof(RawInstruction);
     }
 
@@ -215,24 +217,57 @@ private:
         return true;
     }
 
-    template<std::regular_invocable<DoubleWord, DoubleWord> F>
-    void exec_zicsr_reg_reg(const Instruction &instr, F bin_op)
-    noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+    template<typename F>
+    bool exec_csrrw_csrrwi(const Instruction &instr, F rhs)
     {
-        auto csr = csrs_.get_reg(instr.csr);
-        csrs_.set_reg(instr.csr, bin_op(csr, gprs_.get_reg(instr.rs1)));
-        gprs_.set_reg(instr.rd, csr);
+        if (priv_level_ < CSRegfile::get_lowest_privilege_level(instr.imm) ||
+            CSRegfile::is_for_debug_mode(instr.imm) ||
+            CSRegfile::is_read_only(instr.imm)) [[unlikely]]
+        {
+            raise_exception(MCause::kIllegalInstruction, instr.raw);
+            return false;
+        }
+
+        if (instr.rd == 0)
+            csrs_.set_reg(instr.imm, std::invoke(rhs, instr));
+        else
+        {
+            auto csr = csrs_.get_reg(instr.imm);
+            csrs_.set_reg(instr.imm, std::invoke(rhs, instr));
+            gprs_.set_reg(instr.rd, csr);
+        }
+
         pc_ += sizeof(RawInstruction);
+        return true;
     }
 
-    template<std::regular_invocable<DoubleWord, DoubleWord> F>
-    void exec_zicsr_reg_imm(const Instruction &instr, F bin_op)
-    noexcept(std::is_nothrow_invocable_v<F, DoubleWord, DoubleWord>)
+    template<std::regular_invocable<DoubleWord, DoubleWord> F, typename T>
+    bool exec_csrrs_csrrc(const Instruction &instr, F bin_op, T rhs)
     {
-        auto csr = csrs_.get_reg(instr.csr);
-        csrs_.set_reg(instr.csr, bin_op(csr, instr.imm));
-        gprs_.set_reg(instr.rd, csr);
+        if (priv_level_ < CSRegfile::get_lowest_privilege_level(instr.imm) ||
+            CSRegfile::is_for_debug_mode(instr.imm)) [[unlikely]]
+        {
+            raise_exception(MCause::kIllegalInstruction, instr.raw);
+            return false;
+        }
+
+        if (instr.rs1 == 0)
+            gprs_.set_reg(instr.rd, csrs_.get_reg(instr.imm));
+        else
+        {
+            if (CSRegfile::is_read_only(instr.imm)) [[unlikely]]
+            {
+                raise_exception(MCause::kIllegalInstruction, instr.raw);
+                return false;
+            }
+
+            const auto csr = csrs_.get_reg(instr.imm);
+            csrs_.set_reg(instr.imm, bin_op(csr, std::invoke(rhs, instr)));
+            gprs_.set_reg(instr.rd, csr);
+        }
+
         pc_ += sizeof(RawInstruction);
+        return true;
     }
 
     PrivilegeLevel priv_level_ = PrivilegeLevel::kMachine;

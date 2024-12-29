@@ -16,50 +16,32 @@ find_package(Python REQUIRED COMPONENTS Interpreter)
 
 enable_testing()
 
-set(SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
-set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
-set(CODEGEN_DIR ${PROJECT_SOURCE_DIR}/code-gen)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(BUILD_SOURCE_DIR ${PROJECT_BINARY_DIR}/src)
-set(BUILD_INCLUDE_DIR ${PROJECT_BINARY_DIR}/include)
+set(CODEGEN_DIR ${PROJECT_BINARY_DIR}/code-gen)
 
 # YARVS library
 
 add_library(yarvs-lib STATIC
-    ${SOURCE_DIR}/hart.cpp
-    ${SOURCE_DIR}/executor.cpp
-    ${BUILD_SOURCE_DIR}/decoder.cpp
+    ./src/hart.cpp
+    ./src/executor.cpp
+    ${CODEGEN_DIR}/src/decoder.cpp
 )
-
-add_dependencies(yarvs-lib code_generator)
-
-set_target_properties(yarvs-lib PROPERTIES
-    OUTPUT_NAME yarvs
-    CXX_STANDARD 23
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-)
-
 target_include_directories(yarvs-lib
-    PUBLIC ${INCLUDE_DIR} ${BUILD_INCLUDE_DIR}
+PUBLIC
+    ./include
+    ${CODEGEN_DIR}/include
 )
-
-target_link_libraries(yarvs-lib
-    PRIVATE elfio::elfio
-)
+target_link_libraries(yarvs-lib PRIVATE elfio::elfio)
+target_compile_features(yarvs-lib PUBLIC cxx_std_23)
+set_target_properties(yarvs-lib PROPERTIES OUTPUT_NAME yarvs)
+add_dependencies(yarvs-lib code_generator)
 
 # YARVS simulator
 
-add_executable(yarvs-exe
-    ${SOURCE_DIR}/main.cpp
-)
+add_executable(yarvs-exe ./src/main.cpp)
 
-set_target_properties(yarvs-exe PROPERTIES
-    OUTPUT_NAME yarvs
-    CXX_STANDARD 23
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-)
+set_target_properties(yarvs-exe PROPERTIES OUTPUT_NAME yarvs)
 
 target_link_libraries(yarvs-exe
     PRIVATE yarvs-lib CLI11::CLI11 fmt::fmt

@@ -8,6 +8,8 @@
 #include "common.hpp"
 #include "instruction.hpp"
 #include "bits_manipulation.hpp"
+#include "privileged/cs_regfile.hpp"
+#include "privileged/machine/mcause.hpp"
 
 namespace yarvs
 {
@@ -370,46 +372,45 @@ bool Hart::exec_ebreak(Hart &h, [[maybe_unused]] const Instruction &instr)
 
 // Zicsr extension
 
-bool Hart::exec_csrrc(Hart &h, const Instruction &instr)
-{
-    h.exec_zicsr_reg_reg(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
-    return true;
-}
-
-bool Hart::exec_csrrci(Hart &h, const Instruction &instr)
-{
-    h.exec_zicsr_reg_imm(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; });
-    return true;
-}
-
-bool Hart::exec_csrrs(Hart &h, const Instruction &instr)
-{
-    h.exec_zicsr_reg_reg(instr, std::bit_or{});
-    return true;
-}
-
-bool Hart::exec_csrrsi(Hart &h, const Instruction &instr)
-{
-    h.exec_zicsr_reg_imm(instr, std::bit_or{});
-    return true;
-}
-
 bool Hart::exec_csrrw(Hart &h, const Instruction &instr)
 {
-    auto csr = h.csrs_.get_reg(instr.csr);
-    h.csrs_.set_reg(instr.csr, h.gprs_.get_reg(instr.rs1));
-    h.gprs_.set_reg(instr.rd, csr);
-    h.pc_ += sizeof(RawInstruction);
-    return true;
+    return h.exec_csrrw_csrrwi(instr, [&gprs = h.gprs_](const Instruction &instr)
+    {
+        return gprs.get_reg(instr.rs1);
+    });
 }
 
 bool Hart::exec_csrrwi(Hart &h, const Instruction &instr)
 {
-    auto csr = h.csrs_.get_reg(instr.csr);
-    h.csrs_.set_reg(instr.csr, instr.imm);
-    h.gprs_.set_reg(instr.rd, csr);
-    h.pc_ += sizeof(RawInstruction);
-    return true;
+    return h.exec_csrrw_csrrwi(instr, &Instruction::rs1);
+}
+
+bool Hart::exec_csrrs(Hart &h, const Instruction &instr)
+{
+    return h.exec_csrrs_csrrc(instr, std::bit_or{}, [&gprs = h.gprs_](const Instruction &instr)
+    {
+        return gprs.get_reg(instr.rs1);
+    });
+}
+
+bool Hart::exec_csrrc(Hart &h, const Instruction &instr)
+{
+    return h.exec_csrrs_csrrc(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; },
+                              [&gprs = h.gprs_](const Instruction &instr)
+    {
+        return gprs.get_reg(instr.rs1);
+    });
+}
+
+bool Hart::exec_csrrsi(Hart &h, const Instruction &instr)
+{
+    return h.exec_csrrs_csrrc(instr, std::bit_or{}, &Instruction::rs1);
+}
+
+bool Hart::exec_csrrci(Hart &h, const Instruction &instr)
+{
+    return h.exec_csrrs_csrrc(instr, [](auto lhs, auto rhs){ return lhs & ~rhs; },
+                              &Instruction::rs1);
 }
 
 // System instructions

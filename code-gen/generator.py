@@ -117,21 +117,21 @@ def generate_one_instr_case(id : str, info : dict) -> str:
     vars : list[str] = info["variable_fields"]
 
     out : str = " " * 8  + f"case {info["match"]}:\n" + \
-                " " * 12  + "return [](RawInstruction raw_instr) noexcept {\n" + \
-                " " * 16  + "return Instruction{\n" + \
+                " " * 12 + "return [](RawInstruction raw_instr) noexcept {\n" + \
+                " " * 16 + "return Instruction{\n" + \
+                " " * 20 + f".raw = raw_instr,\n" + \
                 " " * 20 + f".id = InstrID::k{id.upper()}"
 
-    if "rs1" in vars:
+    if any(op in vars for op in ["rs1", "zimm"]):
         out += ",\n" + " " * 20 + ".rs1 = get_bits_r<19, 15, Byte>(raw_instr)"
+
     if "rs2" in vars:
         out += ",\n" + " " * 20 + ".rs2 = get_bits_r<24, 20, Byte>(raw_instr)"
+
     if "rd" in vars:
         out += ",\n" + " " * 20 + ".rd = get_bits_r<11, 7, Byte>(raw_instr)"
 
-    if "csr" in vars:
-        out += ",\n" + " " * 20 + ".csr = get_bits_r<31, 20, HalfWord>(raw_instr)"
-
-    if any(imm_type in vars for imm_type in ["imm12", "shamtd", "shamtw"]):
+    if "csr" in vars or any(imm_type in vars for imm_type in ["imm12", "shamtd", "shamtw"]):
         out += ",\n" + " " * 20 + ".imm = decode_i_imm(raw_instr)"
     elif all(imm_type in vars for imm_type in ["imm12hi", "imm12lo"]):
         out += ",\n" + " " * 20 + ".imm = decode_s_imm(raw_instr)"
@@ -143,8 +143,6 @@ def generate_one_instr_case(id : str, info : dict) -> str:
         out += ",\n" + " " * 20 + ".imm = decode_j_imm(raw_instr)"
     elif all(field in vars for field in ["fm", "pred", "succ"]): # fence instruction
         out += ",\n" + " " * 20 + ".imm = get_bits<31, 20>(raw_instr)"
-    elif "zimm" in vars:
-        out += ",\n" + " " * 20 + ".imm = get_bits<19, 15>(raw_instr)"
 
     out += "\n" + " " * 16 + "};\n" + " " * 12 + "};"
 

@@ -9,15 +9,20 @@ namespace yarvs
 
 struct Instruction final
 {
-    using reg_index_type = Byte; // shall contain at least 5 bits
+    using gpr_index_type = Byte; // shall contain at least 5 bits
     using immediate_type = DoubleWord;
 
+    RawInstruction raw;
     InstrID id;
-    reg_index_type rs1;
-    reg_index_type rs2;
-    reg_index_type rd;
-    HalfWord csr;
-    immediate_type imm; // sign-extended on decoding
+    gpr_index_type rs1;
+    gpr_index_type rs2;
+    gpr_index_type rd;
+
+    /*
+     * 1. sign-extended on decoding
+     * 2. used as a subscript into CSR regfile
+     */
+    immediate_type imm;
 
     bool is_terminator() const noexcept
     {
