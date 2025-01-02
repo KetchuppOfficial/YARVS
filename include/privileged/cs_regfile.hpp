@@ -14,6 +14,7 @@
 #include "privileged/supervisor/scause.hpp"
 
 #include "privileged/machine/mstatus.hpp"
+#include "privileged/machine/misa.hpp"
 #include "privileged/machine/mcause.hpp"
 
 namespace yarvs
@@ -34,6 +35,7 @@ public:
         kSATP = 0x180,
 
         kMStatus = 0x300,
+        kMISA = 0x301,
         kMEDeleg = 0x302,
         kMTVec = 0x305,
         kMScratch = 0x340,
@@ -118,6 +120,9 @@ public:
         set_reg(kMStatus, v);
         set_reg(kSStatus, get_reg(kSStatus) | v);
     }
+
+    MISA get_misa() const noexcept { return get_reg(kMISA); }
+    void set_misa(DoubleWord v) noexcept { set_reg(kMISA, v); }
 
     DoubleWord get_medeleg() const noexcept { return get_reg(kMEDeleg); }
     void set_medeleg(DoubleWord v) noexcept { set_reg(kMEDeleg, v); }

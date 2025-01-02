@@ -15,6 +15,7 @@
 #include "memory/memory.hpp"
 #include "memory/virtual_address.hpp"
 
+#include "privileged/machine/misa.hpp"
 #include "privileged/xtvec.hpp"
 #include "privileged/supervisor/satp.hpp"
 #include "privileged/supervisor/sstatus.hpp"
@@ -22,7 +23,10 @@
 namespace yarvs
 {
 
-Hart::Hart() : mem_{csrs_, priv_level_}, bb_cache_{kDefaultCacheCapacity} {}
+Hart::Hart() : mem_{csrs_, priv_level_}, bb_cache_{kDefaultCacheCapacity}
+{
+    csrs_.set_misa(MISA::Extensions::kI | MISA::Extensions::kS | MISA::Extensions::kU);
+}
 
 Hart::Hart(const Config &config, const std::filesystem::path &path) : Hart{}
 {
