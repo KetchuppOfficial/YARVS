@@ -1,8 +1,8 @@
 #ifndef INCLUDE_MEMORY_PTE_HPP
 #define INCLUDE_MEMORY_PTE_HPP
 
-#include "common.hpp"
-#include "bits_manipulation.hpp"
+#include "yarvs/bits_manipulation.hpp"
+#include "yarvs/common.hpp"
 
 namespace yarvs
 {
@@ -49,9 +49,31 @@ public:
     constexpr bool get_D() const noexcept { return mask_bit<7>(entry_); }
     constexpr void set_D(bool d) noexcept { entry_ = set_bit<7>(entry_, d); }
 
-    // physical page number
-    constexpr  DoubleWord get_ppn() const noexcept { return get_bits<53, 10>(entry_); }
-    constexpr  void set_ppn(DoubleWord ppn) noexcept { entry_ = set_bits<53, 10>(entry_, ppn); }
+    // ppn[to:0] with appropriate shift for use in a virtual address
+    template<std::size_t kLevels>
+    constexpr DoubleWord get_lower_ppn(std::size_t to) const noexcept {
+        static_assert(3 <= kLevels && kLevels <= 5);
+        assert(to < kLevels);
+
+        if (to == kLevels - 1)
+            return get_whole_ppn();
+        return mask_bits(entry_, 18 + 9 * to, 10) << 2;
+    }
+
+    // ppn[(kLevels - 1):from] with appropriate shift for use in a virtual address
+    template<std::size_t kLevels>
+    constexpr DoubleWord get_upper_ppn(std::size_t from) const noexcept {
+        static_assert(3 <= kLevels && kLevels <= 5);
+        assert(from < kLevels);
+
+        if (from == 0)
+            return get_whole_ppn();
+        return mask_bits(entry_, 53, 10 + 9 * from) << 2;
+    }
+
+    // get all PPNs with appropriate shift for use in a virtual address
+    constexpr DoubleWord get_whole_ppn() const noexcept { return mask_bits<53, 10>(entry_) << 2; }
+    constexpr void set_ppn(DoubleWord ppn) noexcept { entry_ = set_bits<53, 10>(entry_, ppn); }
 
     /*
      * The RSW field is reserved for use by the supervisor software; the implementation shall ignore

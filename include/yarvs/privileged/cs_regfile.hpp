@@ -3,28 +3,29 @@
 
 #include <array>
 #include <cassert>
+#include <utility>
 
-#include "bits_manipulation.hpp"
-#include "common.hpp"
+#include "yarvs/bits_manipulation.hpp"
+#include "yarvs/common.hpp"
 
-#include "privileged/xtvec.hpp"
+#include "yarvs/privileged/xtvec.hpp"
 
-#include "privileged/supervisor/sstatus.hpp"
-#include "privileged/supervisor/satp.hpp"
-#include "privileged/supervisor/scause.hpp"
+#include "yarvs/privileged/supervisor/satp.hpp"
+#include "yarvs/privileged/supervisor/scause.hpp"
+#include "yarvs/privileged/supervisor/sstatus.hpp"
 
-#include "privileged/machine/mstatus.hpp"
-#include "privileged/machine/misa.hpp"
-#include "privileged/machine/mcause.hpp"
+#include "yarvs/privileged/machine/mcause.hpp"
+#include "yarvs/privileged/machine/misa.hpp"
+#include "yarvs/privileged/machine/mstatus.hpp"
 
 namespace yarvs
 {
 
-class CSRegfile final
+class CSRegFile final
 {
 public:
 
-    enum CSR : HalfWord
+    enum CSR : DoubleWord
     {
         kSStatus = 0x100,
         kSTVec = 0x105,
@@ -46,13 +47,13 @@ public:
 
     static constexpr std::size_t kNRegs = 4096;
 
-    CSRegfile() = default;
+    CSRegFile() = default;
 
-    CSRegfile(const CSRegfile &rhs) = delete;
-    CSRegfile &operator=(const CSRegfile &rhs) = delete;
+    CSRegFile(const CSRegFile &rhs) = delete;
+    CSRegFile &operator=(const CSRegFile &rhs) = delete;
 
-    CSRegfile(CSRegfile &&rhs) = delete;
-    CSRegfile &operator=(CSRegfile &&rhs) = delete;
+    CSRegFile(CSRegFile &&rhs) = delete;
+    CSRegFile &operator=(CSRegFile &&rhs) = delete;
 
     DoubleWord get_reg(std::size_t i) const noexcept
     {
@@ -80,7 +81,7 @@ public:
     void set_sstatus(DoubleWord v) noexcept
     {
         set_reg(kSStatus, v);
-        set_reg(kMStatus, get_reg(kMStatus) | v);
+        set_reg(kMStatus, (get_reg(kMStatus) & ~SStatus::kMask) | (v & SStatus::kMask));
     }
 
     // supervisor trap handler base address
@@ -118,7 +119,7 @@ public:
     void set_mstatus(DoubleWord v) noexcept
     {
         set_reg(kMStatus, v);
-        set_reg(kSStatus, get_reg(kSStatus) | v);
+        set_reg(kSStatus, v & SStatus::kMask);
     }
 
     MISA get_misa() const noexcept { return get_reg(kMISA); }
@@ -146,6 +147,45 @@ public:
     // supervisor trap value
     DoubleWord get_mtval() const noexcept { return get_reg(kMTVal); }
     void set_mtval(DoubleWord v) noexcept { set_reg(kMTVal, v); }
+
+    static constexpr const char *name(CSR csr) noexcept
+    {
+        switch (csr)
+        {
+            case kSStatus:
+                return "sstatus";
+            case kSTVec:
+                return "stvec";
+            case kSScratch:
+                return "sscratch";
+            case kSEPC:
+                return "sepc";
+            case kSCause:
+                return "scause";
+            case kSTVal:
+                return "stval";
+            case kSATP:
+                return "satp";
+            case kMStatus:
+                return "mstatus";
+            case kMISA:
+                return "misa";
+            case kMEDeleg:
+                return "medeleg";
+            case kMTVec:
+                return "mtvec";
+            case kMScratch:
+                return "mscratch";
+            case kMEPC:
+                return "mepc";
+            case kMCause:
+                return "mcause";
+            case kMTVal:
+                return "mtval";
+            default:
+                std::unreachable();
+        }
+    }
 
 private:
 

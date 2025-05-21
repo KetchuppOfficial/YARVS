@@ -1,8 +1,10 @@
 #ifndef INCLUDE_INSTRUCTION_HPP
 #define INCLUDE_INSTRUCTION_HPP
 
-#include "common.hpp"
-#include "identifiers.hpp" // generated header
+#include <string>
+
+#include "yarvs/common.hpp"
+#include "yarvs/identifiers.hpp" // generated header
 
 namespace yarvs
 {
@@ -45,6 +47,8 @@ struct Instruction final
                 return false;
         }
     }
+
+    std::string disassemble() const;
 };
 
 } // namespace yarvs

@@ -2,29 +2,32 @@
 #define INCLUDE_HART_HPP
 
 #include <array>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
+#include <cstdio>
 #include <expected>
-#include <array>
-#include <vector>
-#include <concepts>
-#include <type_traits>
 #include <functional>
-#include <iostream>
+#include <memory>
+#include <string_view>
+#include <type_traits>
+#include <vector>
 
-#include "common.hpp"
-#include "instruction.hpp"
-#include "reg_file.hpp"
-#include "config.hpp"
+#include "yarvs/common.hpp"
+#include "yarvs/instruction.hpp"
+#include "yarvs/reg_file.hpp"
 
-#include "memory/memory.hpp"
+#include "yarvs/cache/lru.hpp"
 
-#include "cache/lru.hpp"
+#include "yarvs/memory/memory.hpp"
 
-#include "privileged/cs_regfile.hpp"
+#include "yarvs/privileged/cs_regfile.hpp"
 
-#include "privileged/supervisor/scause.hpp"
+#include "yarvs/privileged/machine/mcause.hpp"
+#include "yarvs/privileged/machine/mstatus.hpp"
+
+#include "yarvs/privileged/supervisor/scause.hpp"
+#include "yarvs/privileged/supervisor/sstatus.hpp"
 
 namespace yarvs
 {
@@ -33,39 +36,40 @@ class Hart final
 {
 public:
 
+    static constexpr std::size_t kSP = 2;
     static constexpr std::size_t kSyscallRetReg = 10;
     static constexpr std::array<std::size_t, 6> kSyscallArgRegs = {10, 11, 12, 13, 14, 15};
     static constexpr std::size_t kSyscallNumReg = 17;
 
     explicit Hart();
-    explicit Hart(const Config &config, const std::filesystem::path &path);
 
     // returns the number of executed instructions
     std::uintmax_t run();
 
-    Word get_pc() const noexcept { return pc_; }
+    // returns false if an exception was raised
+    bool run_single();
+
+    DoubleWord get_pc() const noexcept { return pc_; }
     void set_pc(DoubleWord pc) noexcept { pc_ = pc; }
 
     RegFile &gprs() noexcept { return gprs_; }
     const RegFile &gprs() const noexcept { return gprs_; }
+
+    CSRegFile &csrs() noexcept { return csrs_; }
+    const CSRegFile &csrs() const noexcept { return csrs_; }
 
     Memory &memory() noexcept { return mem_; }
     const Memory &memory() const noexcept { return mem_; }
 
     int get_status() const noexcept { return status_; }
 
+    bool logging_enabled() const noexcept { return logging_; }
+    void set_logging(bool logging) noexcept { logging_ = logging; }
+    void set_log_file(std::string_view file_name);
+
     PrivilegeLevel get_privilege_level() const noexcept { return priv_level_; }
 
 private:
-
-    void load_elf(const Config &config, const std::filesystem::path &path);
-
-    static constexpr std::array<uint32_t, 4> kDefaultExceptionHandler = {
-        0x34201573, // csrrw x10, mcause, x0
-        0x06450513, // addi x10, x10, 100
-        0x05d00893, // addi x17, x0, 93
-        0x00000073  // ecall
-    };
 
     void raise_exception(DoubleWord cause, DoubleWord info) noexcept
     {
@@ -121,12 +125,9 @@ private:
      */
     using callback_type = bool(*)(Hart &, const Instruction &);
 
-    #include "executor_declarations.hpp"
+    #include "yarvs/executor_declarations.hpp" // generated header
 
-    bool execute(const Instruction &instr)
-    {
-        return kCallbacks_[instr.id](*this, instr);
-    }
+    bool execute(const Instruction &instr);
 
     template<std::regular_invocable<DoubleWord, DoubleWord> F>
     void exec_rvi_reg_reg(const Instruction &instr, F bin_op)
@@ -220,9 +221,9 @@ private:
     template<typename F>
     bool exec_csrrw_csrrwi(const Instruction &instr, F rhs)
     {
-        if (priv_level_ < CSRegfile::get_lowest_privilege_level(instr.imm) ||
-            CSRegfile::is_for_debug_mode(instr.imm) ||
-            CSRegfile::is_read_only(instr.imm)) [[unlikely]]
+        if (priv_level_ < CSRegFile::get_lowest_privilege_level(instr.imm) ||
+            CSRegFile::is_for_debug_mode(instr.imm) ||
+            CSRegFile::is_read_only(instr.imm)) [[unlikely]]
         {
             raise_exception(MCause::kIllegalInstruction, instr.raw);
             return false;
@@ -244,8 +245,8 @@ private:
     template<std::regular_invocable<DoubleWord, DoubleWord> F, typename T>
     bool exec_csrrs_csrrc(const Instruction &instr, F bin_op, T rhs)
     {
-        if (priv_level_ < CSRegfile::get_lowest_privilege_level(instr.imm) ||
-            CSRegfile::is_for_debug_mode(instr.imm)) [[unlikely]]
+        if (priv_level_ < CSRegFile::get_lowest_privilege_level(instr.imm) ||
+            CSRegFile::is_for_debug_mode(instr.imm)) [[unlikely]]
         {
             raise_exception(MCause::kIllegalInstruction, instr.raw);
             return false;
@@ -255,7 +256,7 @@ private:
             gprs_.set_reg(instr.rd, csrs_.get_reg(instr.imm));
         else
         {
-            if (CSRegfile::is_read_only(instr.imm)) [[unlikely]]
+            if (CSRegFile::is_read_only(instr.imm)) [[unlikely]]
             {
                 raise_exception(MCause::kIllegalInstruction, instr.raw);
                 return false;
@@ -272,13 +273,10 @@ private:
 
     PrivilegeLevel priv_level_ = PrivilegeLevel::kMachine;
 
-    static constexpr DoubleWord kSP = 2;
     RegFile gprs_;
     DoubleWord pc_;
-    CSRegfile csrs_;
+    CSRegFile csrs_;
 
-    static constexpr DoubleWord kPPN = 1;
-    static constexpr DoubleWord kFreePhysMemBegin = Memory::kPhysMemAmount / 4;
     Memory mem_;
 
     static constexpr std::size_t kDefaultCacheCapacity = 64;
@@ -288,6 +286,19 @@ private:
 
     int status_ = 0;
     bool run_ = false;
+
+    bool logging_ = false;
+
+    struct LoggerDeleter
+    {
+        void operator()(FILE *file) const noexcept
+        {
+            if (file != stderr)
+                std::fclose(file);
+        }
+    };
+
+    std::unique_ptr<FILE, LoggerDeleter> log_file_;
 };
 
 } // namespace yarvs

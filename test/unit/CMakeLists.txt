@@ -6,6 +6,7 @@ add_executable(unit_tests
 target_link_libraries(unit_tests
 PRIVATE
     yarvs-lib
+    fmt::fmt
     GTest::GTest
     GTest::gtest_main
     Threads::Threads

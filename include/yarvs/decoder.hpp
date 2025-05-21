@@ -1,9 +1,9 @@
 #ifndef INCLUDE_DECODER_HPP
 #define INCLUDE_DECODER_HPP
 
-#include "common.hpp"
-#include "instruction.hpp"
-#include "bits_manipulation.hpp"
+#include "yarvs/bits_manipulation.hpp"
+#include "yarvs/common.hpp"
+#include "yarvs/instruction.hpp"
 
 namespace yarvs
 {

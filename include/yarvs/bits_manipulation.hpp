@@ -2,6 +2,7 @@
 #define INCLUDE_BITS_MANIPULATION
 
 #include <bit>
+#include <cassert>
 #include <climits>
 #include <cstddef>
 #include <concepts>
@@ -15,23 +16,37 @@ static_assert(std::endian::native == std::endian::little);
 template<std::integral T>
 constexpr std::size_t kNBits = sizeof(T) * CHAR_BIT;
 
+/*
+ * Masks bits [to; from] (from <= to) of the input
+ *
+ *  15  13               5         0
+ *   0 1 0 0 1 0 1 1 1 0 1 0 0 1 1 0 -----> 01 111111111 00110
+ *       ^               ^
+ *       to             from
+ */
 template<std::size_t to, std::size_t from, std::unsigned_integral T>
 constexpr T get_mask() noexcept
 {
     static_assert(from < to);
     static_assert(to < kNBits<T>);
 
-    if constexpr (to == kNBits<T> - 1)
-        return ~T{0} - ((T{1} << from) - 1);
-    else
-        return (T{1} << (to + 1)) - (T{1} << from);
+    return (~T{0} >> (kNBits<T> - to - 1)) - ((T{1} << from) - 1);
+}
+
+template<std::unsigned_integral T>
+constexpr T get_mask(std::size_t to, std::size_t from) noexcept
+{
+    assert(from < to);
+    assert(to < kNBits<T>);
+
+    return (~T{0} >> (kNBits<T> - to - 1)) - ((T{1} << from) - 1);
 }
 
 /*
  * Masks bits [to; from] (from <= to) of the input
  *
  *  15  13               5         0
- *   0 1 0 0 1 0 1 1 1 0 1 0 0 1 1 0 -----> 0000101110100000
+ *   0 1 0 0 1 0 1 1 1 0 1 0 0 1 1 0 -----> 00 001011101 00000
  *       ^               ^
  *       to             from
  */
@@ -42,6 +57,15 @@ constexpr T mask_bits(T num) noexcept
     static_assert(to < kNBits<T>);
 
     return num & get_mask<to, from, T>();
+}
+
+template<std::unsigned_integral T>
+constexpr T mask_bits(T num, std::size_t to, std::size_t from) noexcept
+{
+    assert(from < to);
+    assert(to < kNBits<T>);
+
+    return num & get_mask<T>(to, from);
 }
 
 /*
@@ -59,6 +83,15 @@ constexpr T get_bits(T num) noexcept
     static_assert(to < kNBits<T>);
 
     return mask_bits<to, from>(num) >> from;
+}
+
+template<std::unsigned_integral T>
+constexpr T get_bits(T num, std::size_t to, std::size_t from) noexcept
+{
+    assert(from < to);
+    assert(to < kNBits<T>);
+
+    return mask_bits(num, to, from) >> from;
 }
 
 template<std::size_t n, std::unsigned_integral T>

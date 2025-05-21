@@ -1,24 +1,15 @@
-#include <filesystem>
-#include <ranges>
-#include <map>
-#include <stdexcept>
-#include <format>
-#include <utility>
 #include <cstdint>
+#include <ranges>
+#include <system_error>
+#include <utility>
 
-#include <elfio/elfio.hpp>
+#include <fmt/base.h>
 
-#include "hart.hpp"
-#include "common.hpp"
-#include "decoder.hpp"
+#include "yarvs/common.hpp"
+#include "yarvs/decoder.hpp"
+#include "yarvs/hart.hpp"
 
-#include "memory/memory.hpp"
-#include "memory/virtual_address.hpp"
-
-#include "privileged/machine/misa.hpp"
-#include "privileged/xtvec.hpp"
-#include "privileged/supervisor/satp.hpp"
-#include "privileged/supervisor/sstatus.hpp"
+#include "yarvs/privileged/machine/misa.hpp"
 
 namespace yarvs
 {
@@ -28,159 +19,58 @@ Hart::Hart() : mem_{csrs_, priv_level_}, bb_cache_{kDefaultCacheCapacity}
     csrs_.set_misa(MISA::Extensions::kI | MISA::Extensions::kS | MISA::Extensions::kU);
 }
 
-Hart::Hart(const Config &config, const std::filesystem::path &path) : Hart{}
+void Hart::set_log_file(std::string_view file_name)
 {
-    SStatus sstatus;
-    sstatus.set_mxr(true);
-    csrs_.set_sstatus(sstatus);
-
-    SATP satp;
-    satp.set_mode(config.get_translation_mode());
-    satp.set_ppn(kPPN);
-    csrs_.set_satp(satp);
-
-    static_assert(sizeof(void *) == sizeof(DoubleWord));
-    XTVec mtvec;
-    mtvec.set_base(0);
-    csrs_.set_mtvec(mtvec);
-
-    load_elf(config, path);
-
-    gprs_.set_reg(kSP, config.get_stack_top());
+    if (file_name.empty())
+        log_file_.reset(stderr);
+    else if (FILE *file = std::fopen(file_name.data(), "w"))
+        log_file_.reset(file);
+    else
+    {
+        logging_ = false;
+        throw std::system_error{errno, std::system_category(), "std::fopen() failed"};
+    }
 }
 
-namespace
+bool Hart::execute(const Instruction &instr)
 {
+    if (!logging_)
+        return kCallbacks_[instr.id](*this, instr);
 
-template<std::ranges::input_range R>
-auto collect_pages(R &&loadable_segments, DoubleWord stack_top, DoubleWord n_stack_pages)
-{
-    std::map<DoubleWord, ELFIO::Elf_Word> pages;
-    for (const auto &seg : loadable_segments)
+    fmt::println(log_file_.get(), "[{:#010x}]: {}", pc_, instr.disassemble());
+    if (instr.id == InstrID::kECALL)
     {
-        const auto va = seg->get_virtual_address();
-        auto first_page_addr = mask_bits<63, Memory::kPageBits>(va);
-        const auto last_page_addr = mask_bits<63, Memory::kPageBits>(va + seg->get_memory_size());
-
-        auto flags = seg->get_flags();
-        for (; first_page_addr <= last_page_addr; first_page_addr += Memory::kPageSize)
-            pages.emplace(first_page_addr, flags);
-    }
-
-    const auto stack_last_page = mask_bits<63, Memory::kPageBits>(stack_top);
-    for (auto i = 0; i != n_stack_pages; ++i)
-        pages.emplace(stack_last_page - i * Memory::kPageSize, ELFIO::PF_R | ELFIO::PF_W);
-
-    return pages;
-}
-
-} // unnamed namespace
-
-void Hart::load_elf(const Config &config, const std::filesystem::path &path)
-{
-    ELFIO::elfio elf;
-    if (!elf.load(path.native()))
-        throw std::runtime_error{std::format("could not load ELF file \"{}\"", path.native())};
-
-    if (auto error_msg = elf.validate(); !error_msg.empty())
-        throw std::invalid_argument{std::format("ELF file is invalid: {}", error_msg)};
-
-    if (elf.get_class() != ELFIO::ELFCLASS64)
-        throw std::invalid_argument{"only 64-bit ELF files are supported"};
-
-    if (auto type = elf.get_type(); type != ELFIO::ET_EXEC)
-    {
-        const char *type_str = [type]
-        {
-            if (ELFIO::ET_LOOS <= type && type <= ELFIO::ET_HIOS)
-                return "os specific";
-
-            if (ELFIO::ET_LOPROC <= type && type <= ELFIO::ET_HIPROC)
-                return "processor specific";
-
-            switch (type)
-            {
-                case ELFIO::ET_NONE:
-                    return "unknown";
-                case ELFIO::ET_REL:
-                    return "relocatable file";
-                case ELFIO::ET_DYN:
-                    return "shared object";
-                case ELFIO::ET_CORE:
-                    return "core file";
-                default:
-                    std::unreachable();
-            }
-        }();
-
-        throw std::invalid_argument{std::format("ELF is of type \"{}\"; executable expected",
-                                    type_str)};
-    }
-
-    if (elf.get_machine() != ELFIO::EM_RISCV)
-        throw std::invalid_argument{"only RISC-V executables are supported"};
-
-    auto is_loadable = [](const auto &seg){ return seg->get_type() == ELFIO::PT_LOAD; };
-    auto loadable_segments = std::views::filter(elf.segments, is_loadable);
-
-    constexpr DoubleWord kStackPages = 4;
-    std::map<DoubleWord, ELFIO::Elf_Word> pages =
-        collect_pages(loadable_segments, config.get_stack_top(), config.get_n_stack_pages());
-
-    // default exception handler
-    const auto stack_last_page = mask_bits<63, Memory::kPageBits>(config.get_stack_top());
-    const auto handler_va = stack_last_page - config.get_n_stack_pages() * Memory::kPageSize;
-
-    const Byte kLevels = csrs_.get_satp().get_mode() - 5;
-    DoubleWord table_end_ppn = 1 + csrs_.get_satp().get_ppn();
-    DoubleWord data_begin_ppn = kFreePhysMemBegin / Memory::kPageSize;
-
-    std::map<DoubleWord, DoubleWord> va_to_pa;
-    for (auto [page, rwx] : pages)
-    {
-        const VirtualAddress va = page;
-        auto a = csrs_.get_satp().get_ppn() * Memory::kPageSize;
-        for (Byte i = kLevels - 1; i > 0; --i)
-        {
-            const auto pa = a + va.get_vpn(i) * sizeof(PTE);
-            PTE pte = mem_.load<DoubleWord>(pa).value();
-            if (pte.get_V())
-                a = pte.get_ppn() * Memory::kPageSize;
-            else
-            {
-                pte = 0b10001; // pointer to next level pte
-                assert(pte.is_pointer_to_next_level_pte());
-                pte.set_ppn(table_end_ppn);
-                mem_.store(pa, +pte);
-                a = table_end_ppn * Memory::kPageSize;
-                ++table_end_ppn;
-            }
+        fmt::println(log_file_.get(), "    syscall:  {}", gprs_.get_reg(kSyscallNumReg));
+        for (const auto i : kSyscallArgRegs) {
+            fmt::println(log_file_.get(), "    x{}:      {:#x}", i, gprs_.get_reg(i));
         }
-
-        va_to_pa.emplace(page, data_begin_ppn * Memory::kPageSize);
-
-        PTE pte = 0b10001; // U V
-        pte.set_R(rwx & ELFIO::PF_R);
-        pte.set_W(rwx & ELFIO::PF_W);
-        pte.set_E(rwx & ELFIO::PF_X);
-        pte.set_ppn(data_begin_ppn++);
-
-        const auto pa = a + va.get_vpn(0) * sizeof(PTE);
-        mem_.store(pa, +pte);
     }
 
-    for (const auto &seg : loadable_segments)
+    const auto old_gprs_ = gprs_;
+
+    const bool res = kCallbacks_[instr.id](*this, instr);
+
+    auto diff_view = std::views::zip(std::views::iota(0uz), old_gprs_, gprs_)
+                   | std::views::filter([](const auto &t){
+                         return std::get<1>(t) != std::get<2>(t);
+                     });
+
+    for (const auto [i, before, after] : diff_view) {
+        fmt::println(log_file_.get(), "    x{}: {:#x} -> {:#x}", i, before, after);
+    }
+
+    return res;
+}
+
+bool Hart::run_single() {
+    if (const auto raw_instr_or_err = mem_.fetch(pc_); !raw_instr_or_err.has_value()) [[unlikely]]
     {
-        auto v_page = mask_bits<63, Memory::kPageBits>(seg->get_virtual_address());
-        auto pa = va_to_pa.at(v_page) |
-            mask_bits<Memory::kPageBits - 1, 0>(seg->get_virtual_address());
-        auto seg_start = reinterpret_cast<const Byte *>(seg->get_data());
-        mem_.store(pa, seg_start, seg_start + seg->get_file_size());
+        raise_exception(raw_instr_or_err.error(), pc_);
+        return false;
     }
-
-    mem_.store(0, kDefaultExceptionHandler.begin(), kDefaultExceptionHandler.end());
-
-    pc_ = elf.get_entry();
+    else if (!execute(Decoder::decode(*raw_instr_or_err))) [[unlikely]]
+        return false;
+    return true;
 }
 
 std::uintmax_t Hart::run()
@@ -216,13 +106,13 @@ std::uintmax_t Hart::run()
 
             for (;;)
             {
-                auto maybe_raw_instr = mem_.fetch(pc_);
-                if (!maybe_raw_instr.has_value()) [[unlikely]]
+                const auto raw_instr_or_err = mem_.fetch(pc_);
+                if (!raw_instr_or_err.has_value()) [[unlikely]]
                 {
-                    raise_exception(maybe_raw_instr.error(), pc_);
+                    raise_exception(raw_instr_or_err.error(), pc_);
                     goto exception;
                 }
-                const auto &instr = bb.emplace_back(Decoder::decode(*maybe_raw_instr));
+                const auto &instr = bb.emplace_back(Decoder::decode(*raw_instr_or_err));
                 if (!execute(instr)) [[unlikely]]
                     goto exception;
                 ++instr_count;

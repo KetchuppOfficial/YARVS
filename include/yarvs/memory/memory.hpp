@@ -4,17 +4,16 @@
 #include <cstddef>
 #include <expected>
 #include <iterator>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
-#include "common.hpp"
-#include "bits_manipulation.hpp"
-
-#include "memory/mmap_wrapper.hpp"
-#include "memory/virtual_address.hpp"
-#include "memory/pte.hpp"
-
-#include "privileged/cs_regfile.hpp"
+#include "yarvs/bits_manipulation.hpp"
+#include "yarvs/common.hpp"
+#include "yarvs/memory/mmap_wrapper.hpp"
+#include "yarvs/memory/virtual_address.hpp"
+#include "yarvs/memory/pte.hpp"
+#include "yarvs/privileged/cs_regfile.hpp"
 
 namespace yarvs
 {
@@ -27,21 +26,16 @@ public:
     static constexpr DoubleWord kPageSize = 1 << kPageBits;
     static constexpr std::size_t kPhysMemAmount = 4 * (std::size_t{1} << 30); // 4GB
 
-    explicit Memory(CSRegfile &csrs, const PrivilegeLevel &priv_mode)
+    explicit Memory(CSRegFile &csrs, const PrivilegeLevel &priv_mode)
         : physical_mem_{kPhysMemAmount, MMapWrapper::kRead | MMapWrapper::kWrite},
           csrs_{csrs}, priv_level_{priv_mode} {}
-
-    enum FaultType
-    {
-        kPageFault
-    };
 
     template<riscv_type T>
     std::expected<T, MCause::Exception> load(DoubleWord va)
     {
         if (!csrs_.is_satp_active(priv_level_))
             return pm_load<T>(va);
-        auto maybe_pa = translate_address<MemoryAccessType::kRead>(va);
+        const auto maybe_pa = translate_address<MemoryAccessType::kRead>(va);
         if (!maybe_pa.has_value()) [[unlikely]]
             return std::unexpected{MCause::Exception::kLoadPageFault};
         return pm_load<T>(*maybe_pa);
@@ -54,7 +48,7 @@ public:
             pm_store(va, value);
         else
         {
-            auto maybe_pa = translate_address<MemoryAccessType::kWrite>(va);
+            const auto maybe_pa = translate_address<MemoryAccessType::kWrite>(va);
             if (!maybe_pa.has_value()) [[unlikely]]
                 return std::unexpected{MCause::Exception::kStoreAMOPageFault};
             pm_store(*maybe_pa, value);
@@ -63,6 +57,7 @@ public:
     }
 
     template<std::input_iterator It>
+    requires riscv_type<std::remove_const_t<typename std::iterator_traits<It>::value_type>>
     void store(DoubleWord va, It first, It last)
     {
         using value_type = std::remove_const_t<typename std::iterator_traits<It>::value_type>;
@@ -74,7 +69,7 @@ public:
     {
         if (!csrs_.is_satp_active(priv_level_))
             return pm_load<RawInstruction>(va);
-        auto maybe_pa = translate_address<MemoryAccessType::kExecute>(va);
+        const auto maybe_pa = translate_address<MemoryAccessType::kExecute>(va);
         if (!maybe_pa.has_value()) [[unlikely]]
             return std::unexpected{MCause::Exception::kInstrPageFault};
         return pm_load<RawInstruction>(*maybe_pa);
@@ -84,7 +79,7 @@ public:
     {
         if (!csrs_.is_satp_active(priv_level_))
             return &physical_mem_[va];
-        auto maybe_pa = translate_address<MemoryAccessType::kRead>(va);
+        const auto maybe_pa = translate_address<MemoryAccessType::kRead>(va);
         if (!maybe_pa.has_value()) [[unlikely]]
             return std::unexpected{MCause::Exception::kLoadPageFault};
         return &physical_mem_[*maybe_pa];
@@ -100,33 +95,35 @@ private:
     };
 
     template<MemoryAccessType kAccessKind>
-    std::expected<DoubleWord, FaultType> translate_address(DoubleWord va)
+    std::optional<DoubleWord> translate_address(DoubleWord va)
     {
-        switch (auto mode = csrs_.get_satp().get_mode())
+        switch (csrs_.get_satp().get_mode())
         {
             case SATP::Mode::kBare:
                 return va;
             case SATP::Mode::kSv39:
                 if (va != sext<39, DoubleWord>(va))
-                    return std::unexpected{FaultType::kPageFault};
-                return translate<kAccessKind, 3>(va);
+                    return std::nullopt;
+                return translate_address<kAccessKind, /*kLevels=*/3>(va);
             case SATP::Mode::kSv48:
                 if (va != sext<48, DoubleWord>(va))
-                    return std::unexpected{FaultType::kPageFault};
-                return translate<kAccessKind, 4>(va);
+                    return std::nullopt;
+                return translate_address<kAccessKind, /*kLevels=*/4>(va);
             case SATP::Mode::kSv57:
                 if (va != sext<57, DoubleWord>(va))
-                    return std::unexpected{FaultType::kPageFault};
-                return translate<kAccessKind, 5>(va);
+                    return std::nullopt;
+                return translate_address<kAccessKind, /*kLevels=*/5>(va);
             default: [[unlikely]]
                 std::unreachable();
         }
     }
 
     template<MemoryAccessType kAccessKind, Byte kLevels>
-    std::expected<DoubleWord, FaultType> translate(VirtualAddress va)
+    std::optional<DoubleWord> translate_address(VirtualAddress va)
     {
-        const SStatus sstatus = csrs_.get_sstatus();
+        static_assert(3 <= kLevels && kLevels <= 5);
+
+        const MStatus mstatus = csrs_.get_mstatus();
         DoubleWord a = csrs_.get_satp().get_ppn() * kPageSize;
 
         PTE pte;
@@ -137,48 +134,73 @@ private:
             pte = pm_load<DoubleWord>(pa);
 
             if (!pte.get_V() || pte.is_rwx_reserved() || pte.uses_reserved())
-                return std::unexpected{FaultType::kPageFault};
+                return std::nullopt;
+
+            // PTE is valid
 
             if (pte.is_pointer_to_next_level_pte())
             {
                 if (i == 0)
-                    return std::unexpected{FaultType::kPageFault};
+                    return std::nullopt;
                 --i;
-                a = pte.get_ppn() * kPageSize;
+                a = pte.get_whole_ppn();
                 continue;
             }
 
+            // A leaf PTE has been found
+
             if constexpr (kAccessKind == MemoryAccessType::kRead)
             {
-                if (!pte.get_R() || (!sstatus.get_mxr() && pte.get_E()))
-                    return std::unexpected{FaultType::kPageFault};
+                if (mstatus.get_mxr())
+                {
+                    if (!pte.get_R() && !pte.get_E())
+                        return std::nullopt;
+                }
+                else if (!pte.get_R())
+                    return std::nullopt;
             }
             else if constexpr (kAccessKind == MemoryAccessType::kWrite)
             {
                 if (!pte.get_W())
-                    return std::unexpected{FaultType::kPageFault};
+                    return std::nullopt;
             }
             else
             {
                 if (!pte.get_E())
-                    return std::unexpected{FaultType::kPageFault};
+                    return std::nullopt;
             }
 
-            if (priv_level_ == PrivilegeLevel::kSupervisor && !sstatus.get_sum() && pte.get_U())
-                return std::unexpected{FaultType::kPageFault};
+            if (priv_level_ == PrivilegeLevel::kSupervisor && pte.get_U() && !mstatus.get_sum())
+                return std::nullopt;
 
-            if (!pte.get_A() || (kAccessKind == MemoryAccessType::kWrite && !pte.get_D()))
-            {
-                if (pte != pm_load<DoubleWord>(pa))
-                    continue;
+            if (i > 0 && pte.get_lower_ppn<kLevels>(i - 1)) // misaligned superpage
+                return std::nullopt;
 
-                pte.set_A(true);
-                if constexpr (kAccessKind == MemoryAccessType::kWrite)
+            if constexpr (kAccessKind == MemoryAccessType::kWrite) {
+                if (!pte.get_A() || !pte.get_D())
+                {
+                    if (pte != pm_load<DoubleWord>(pa))
+                        continue;
+
+                    pte.set_A(true);
                     pte.set_D(true);
+                }
+            } else {
+                if (!pte.get_A())
+                {
+                    if (pte != pm_load<DoubleWord>(pa))
+                        continue;
+
+                    pte.set_A(true);
+                }
             }
 
             pm_store(pa, +pte);
-            return (pte.get_ppn() << kPageBits) | va.get_page_offset();
+
+            DoubleWord result = pte.get_upper_ppn<kLevels>(i) | va.get_page_offset();
+            if (i > 0) // superpage translation
+                result |= pte.get_lower_ppn<kLevels>(i - 1);
+            return result;
         }
     }
 
@@ -189,7 +211,7 @@ private:
     void pm_store(DoubleWord pa, T value) { *reinterpret_cast<T*>(&physical_mem_[pa]) = value; }
 
     MMapWrapper physical_mem_;
-    CSRegfile &csrs_;
+    CSRegFile &csrs_;
     const PrivilegeLevel &priv_level_;
 };
 

@@ -1,14 +1,13 @@
 #ifndef INCLUDE_MEMORY_MMAP_WRAPPER_HPP
 #define INCLUDE_MEMORY_MMAP_WRAPPER_HPP
 
-#include <cstdint>
-#include <cstddef>
-#include <memory>
 #include <cassert>
-#include <cstring>
 #include <cerrno>
-#include <stdexcept>
-#include <format>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <system_error>
 #include <type_traits>
 
 #include <sys/mman.h>
@@ -63,7 +62,7 @@ private:
         auto ptr = static_cast<std::uint8_t *>(mmap(NULL, len, prot, MAP_PRIVATE | MAP_ANONYMOUS,
                                                     -1 /* fd */, 0 /* offset */));
         if (ptr == MAP_FAILED) [[unlikely]]
-            throw std::runtime_error{std::format("mmap failed: {}", std::strerror(errno))};
+            throw std::system_error{errno, std::system_category(), "mmap() failed"};
         return ptr;
     }
 

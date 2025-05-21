@@ -1,8 +1,8 @@
 #ifndef INCLUDE_PRIVILEGED_SUPERVISOR_SATP_HPP
 #define INCLUDE_PRIVILEGED_SUPERVISOR_SATP_HPP
 
-#include "common.hpp"
-#include "bits_manipulation.hpp"
+#include "yarvs/common.hpp"
+#include "yarvs/bits_manipulation.hpp"
 
 namespace yarvs
 {
@@ -26,6 +26,21 @@ public:
         /* 12-13 */ // reserved for standard use
         /* 14-15 */ // designated for custom use
     };
+
+    static constexpr Byte pt_levels(Mode mode) noexcept
+    {
+        switch (mode)
+        {
+            case Mode::kSv39:
+                return 3;
+            case Mode::kSv48:
+                return 4;
+            case Mode::kSv57:
+                return 5;
+            default:
+                return 0;
+        }
+    }
 
     constexpr SATP() noexcept : value_{0} {}
     constexpr SATP(DoubleWord value) noexcept : value_{value} {}

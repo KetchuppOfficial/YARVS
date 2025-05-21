@@ -25,14 +25,20 @@ set(CODEGEN_DIR ${PROJECT_BINARY_DIR}/code-gen)
 add_library(yarvs-lib STATIC
     ./src/hart.cpp
     ./src/executor.cpp
+    ./src/elf_loader.cpp
     ${CODEGEN_DIR}/src/decoder.cpp
+    ${CODEGEN_DIR}/src/instruction.cpp
 )
 target_include_directories(yarvs-lib
 PUBLIC
     ./include
     ${CODEGEN_DIR}/include
 )
-target_link_libraries(yarvs-lib PRIVATE elfio::elfio)
+target_link_libraries(yarvs-lib
+PRIVATE
+    elfio::elfio
+    fmt::fmt
+)
 target_compile_features(yarvs-lib PUBLIC cxx_std_23)
 set_target_properties(yarvs-lib PROPERTIES OUTPUT_NAME yarvs)
 add_dependencies(yarvs-lib code_generator)

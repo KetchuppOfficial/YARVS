@@ -3,8 +3,8 @@
 
 #include <utility>
 
-#include "common.hpp"
-#include "bits_manipulation.hpp"
+#include "yarvs/common.hpp"
+#include "yarvs/bits_manipulation.hpp"
 
 namespace yarvs
 {

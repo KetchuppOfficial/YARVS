@@ -1,15 +1,16 @@
-#include <format>
 #include <functional>
 #include <stdexcept>
 
 #include <unistd.h>
 
-#include "hart.hpp"
-#include "common.hpp"
-#include "instruction.hpp"
-#include "bits_manipulation.hpp"
-#include "privileged/cs_regfile.hpp"
-#include "privileged/machine/mcause.hpp"
+#include <fmt/format.h>
+
+#include "yarvs/bits_manipulation.hpp"
+#include "yarvs/common.hpp"
+#include "yarvs/hart.hpp"
+#include "yarvs/instruction.hpp"
+
+#include "yarvs/privileged/cs_regfile.hpp"
 
 namespace yarvs
 {
@@ -357,7 +358,7 @@ bool Hart::exec_ecall(Hart &h, [[maybe_unused]] const Instruction &instr)
             h.status_ = h.gprs_.get_reg(Hart::kSyscallRetReg);
             break;
         default:
-            throw std::runtime_error{std::format("System call {:#x} at pc {:#x} is not supported",
+            throw std::runtime_error{fmt::format("System call {} at pc {:#x} is not supported",
                                                  syscall_num, h.pc_)};
     }
 

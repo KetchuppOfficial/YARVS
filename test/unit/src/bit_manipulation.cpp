@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "bits_manipulation.hpp"
+#include "yarvs/bits_manipulation.hpp"
 
 TEST(Bits_Manipulation, Mask_Bits)
 {

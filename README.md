@@ -17,8 +17,7 @@ The following applications and libraries have to be installed:
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
-pip3 install -r requirements.txt
+.venv/bin/pip3 install -r requirements.txt
 ```
 
 ### 2) Build the project

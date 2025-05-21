@@ -1,6 +1,7 @@
 build/
-third_party/
+third_party*/
 .venv/
 .vscode/
 .cache/
 CMakeUserPresets.json
+*.log
