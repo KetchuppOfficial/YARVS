@@ -69,10 +69,8 @@ def generate_multiple_mask_cases(multiple_mask_opcodes : list[tuple[int, list[in
         masks : list[str] = [f"mask_type{{{mask:#x}}}" for mask in sorted(masks, reverse=True)]
         case : str = " " *  8 + f"case {opcode:#x}:\n" + \
                      " " * 12 + f"for (auto mask : {{{", ".join(masks)}}})\n" + \
-                     " " * 12 + "{\n" + \
                      " " * 16 + "if (auto decoder = get_decoder(raw_instr & mask))\n" + \
                      " " * 20 + "return decoder(raw_instr);\n" + \
-                     " " * 12 + "}\n" + \
                      " " * 12 + "break;"
         cases.append(case)
 
