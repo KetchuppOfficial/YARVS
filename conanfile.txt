@@ -1,5 +1,5 @@
 [requires]
-fmt/11.0.2
+fmt/10.2.1
 elfio/3.12
 cli11/2.4.2
 

@@ -3,7 +3,7 @@
 #include <system_error>
 #include <utility>
 
-#include <fmt/base.h>
+#include <fmt/core.h>
 
 #include "yarvs/common.hpp"
 #include "yarvs/decoder.hpp"

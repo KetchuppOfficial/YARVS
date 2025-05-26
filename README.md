@@ -1,6 +1,27 @@
 # YARVS - Yet Another RISC-V Simulator
 
-## Requirements
+## How to build with nix package manager
+
+### 0) Requirements
+
+Installed nix package manager.
+
+### 1) Create development environment
+
+```bash
+nix develop
+```
+
+### 2) Build the project
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build [--target <tgt>]
+```
+
+## How to build with conan package manager
+
+### 0) Requirements
 
 The following applications and libraries have to be installed:
 
@@ -8,10 +29,6 @@ The following applications and libraries have to be installed:
 - python3
 - python3-venv
 - pip
-
-## How to build
-
-### 0) Make sure you are in the root directory of the project (i.e. YARVS/)
 
 ### 1) Installing conan and other python modules this project depends on
 
