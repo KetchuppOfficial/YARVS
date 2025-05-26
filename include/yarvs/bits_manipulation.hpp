@@ -3,6 +3,7 @@
 
 #include <bit>
 #include <cassert>
+#include <cstdint>
 #include <climits>
 #include <cstddef>
 #include <concepts>
@@ -30,7 +31,8 @@ constexpr T get_mask() noexcept
     static_assert(from < to);
     static_assert(to < kNBits<T>);
 
-    return (~T{0} >> (kNBits<T> - to - 1)) - ((T{1} << from) - 1);
+    using U = std::conditional_t<(kNBits<T> < kNBits<std::uint32_t>), std::uint32_t, T>;
+    return (~U{0} >> (kNBits<U> - to - 1)) - ((U{1} << from) - U{1});
 }
 
 template<std::unsigned_integral T>
@@ -39,7 +41,8 @@ constexpr T get_mask(std::size_t to, std::size_t from) noexcept
     assert(from < to);
     assert(to < kNBits<T>);
 
-    return (~T{0} >> (kNBits<T> - to - 1)) - ((T{1} << from) - 1);
+    using U = std::conditional_t<(kNBits<T> < kNBits<std::uint32_t>), std::uint32_t, T>;
+    return (~U{0} >> (kNBits<U> - to - 1)) - ((U{1} << from) - U{1});
 }
 
 /*
