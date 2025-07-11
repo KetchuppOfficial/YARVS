@@ -14,7 +14,9 @@
 namespace yarvs
 {
 
-Hart::Hart() : mem_{csrs_, priv_level_}, bb_cache_{kDefaultCacheCapacity}
+Hart::Hart()
+    : priv_level_{PrivilegeLevel::kMachine}, mem_{csrs_, priv_level_},
+      bb_cache_{kDefaultCacheCapacity}
 {
     csrs_.set_misa(MISA::Extensions::kI | MISA::Extensions::kS | MISA::Extensions::kU);
 }
@@ -63,12 +65,16 @@ bool Hart::execute(const Instruction &instr)
 }
 
 bool Hart::run_single() {
+    run_ = true;
+
     if (const auto raw_instr_or_err = mem_.fetch(pc_); !raw_instr_or_err.has_value()) [[unlikely]]
     {
         raise_exception(raw_instr_or_err.error(), pc_);
         return false;
     }
     else if (!execute(Decoder::decode(*raw_instr_or_err))) [[unlikely]]
+        return false;
+    else if (!run_)
         return false;
     return true;
 }

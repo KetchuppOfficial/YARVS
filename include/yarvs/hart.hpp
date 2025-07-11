@@ -271,7 +271,7 @@ private:
         return true;
     }
 
-    PrivilegeLevel priv_level_ = PrivilegeLevel::kMachine;
+    PrivilegeLevel priv_level_;
 
     RegFile gprs_;
     DoubleWord pc_;
